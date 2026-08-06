@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B5 Member Portal</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght=400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #FAF6F0;
+            color: #4A3419;
+        }
+        .premium-shadow {
+            box-shadow: 0 10px 25px -5px rgba(99, 58, 17, 0.06);
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        @keyframes custom-bounce {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-5px) scale(1.15); }
+        }
+        .gift-bounce {
+            animation: custom-bounce 1.2s infinite ease-in-out;
+            display: inline-block;
+        }
+
+        /* 🔒 Security Gate Interface */
+        #b5SecurityGate {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #FAF6F0;
+            z-index: 99999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .security-card {
+            max-width: 400px;
+            width: 90%;
+            padding: 35px 25px;
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 20px 40px -10px rgba(99, 58, 17, 0.1);
+            text-align: center;
+            box-sizing: border-box;
+            border: 1px solid #F2E4D4;
+        }
+        .input-control {
+            width: 100%;
+            background-color: #FAF6F0;
+            border: 1px solid #EADCC9;
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-bottom: 14px;
+            box-sizing: border-box;
+            font-size: 14px;
+            color: #4A3419;
+            transition: all 0.2s;
+        }
+        /* 带图标的输入框右侧预留空间 */
+        .input-control.has-icon {
+            padding-right: 42px;
+        }
+        .input-control:focus {
+            outline: none;
+            border-color: #633A11;
+            background-color: #ffffff;
+        }
+        .btn-block {
+            width: 100%;
+            padding: 13px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            box-sizing: border-box;
+            transition: all 0.2s;
+        }
+        .btn-main { background: #633A11; color: white; margin-bottom: 12px; }
+        .btn-main:hover { background: #4A2B0C; }
+        .btn-text-link { background: transparent; color: #8C745A; border: 1px dashed #EADCC9; font-size: 12px; font-weight: 600; }
+        .btn-text-link:hover { background: #FAF6F0; }
+        .btn-danger { background: #C5221F; color: white; }
+        .btn-danger:hover { background: #A51D1A; }
+        .status-msg { font-size: 12px; margin-top: 12px; font-weight: 600; text-align: center; }
+    </style>
+</head>
+<body class="pb-24">
+
+    <!-- =========================================================================
+       🔒 Layer 1: Secure Gate Interface
+       ========================================================================= -->
+    <div id="b5SecurityGate">
+        
+        <!-- Login Panel -->
+        <div id="b5LoginPanel" class="security-card">
+            <h2 class="text-xl font-extrabold text-[#633A11] mb-1">🎁 B5 Cuisine Cafe</h2>
+            <p class="text-xs text-[#8C745A] font-medium mb-6">Member Portal & Benefit Access</p>
+            
+            <form onsubmit="event.preventDefault(); handleFrontendLogin();" novalidate>
+                <input type="text" id="loginIdentity" name="username" autocomplete="username" onblur="normalizeLoginIdentity(this)" class="input-control" placeholder="Phone Number or Email" />
+                
+                <!-- Login Password with Toggle -->
+                <div class="relative w-full">
+                    <input type="password" id="loginPassword" name="password" autocomplete="current-password" class="input-control has-icon" placeholder="Enter Password" />
+                    <button type="button" onclick="togglePasswordVisibility('loginPassword', this)" class="absolute right-3 top-[14px] text-gray-400 hover:text-[#633A11] focus:outline-none cursor-pointer">
+                        <i class="fa-solid fa-eye text-sm"></i>
+                    </button>
+                </div>
+
+                <button type="submit" class="btn-block btn-main shadow-sm">Sign In</button>
+                <button type="button" onclick="triggerForgotPassword()" class="btn-block btn-text-link">First Time Login / Forgot Password</button>
+            </form>
+            
+            <p id="loginMessage" class="status-msg" style="display: none;"></p>
+        </div>
+
+<!-- 📧 2️⃣ 界面：输入验证码卡片 (默认隐藏) -->
+<div id="b5VerifyCodePanel" class="security-card" style="display: none; border-top: 4px solid #B87E31;">
+    <h3 class="text-base font-extrabold text-[#633A11] mb-1">📧 Email Verification</h3>
+    <p class="text-xs text-gray-500 mb-5 leading-relaxed">
+        We've sent a 6-digit verification code to your email. Please enter it below:
+    </p>
+    
+    <form onsubmit="event.preventDefault(); handleVerifyCode();" novalidate>
+        <div class="mb-4">
+            <input type="text" id="emailAuthCode" class="input-control text-center tracking-widest font-mono text-lg font-bold" placeholder="123456" maxlength="6" />
+        </div>
+
+        <button type="submit" id="btnSubmitCode" class="btn-block btn-main shadow-sm mb-2">Verify Code</button>
+        <button type="button" onclick="backToLoginPanel()" class="btn-block btn-text-link">Cancel / Back to Login</button>
+    </form>
+    
+    <p id="verifyCodeMessage" class="status-msg" style="display: none;"></p>
+</div>
+
+        <!-- Force Change Password Panel -->
+        <div id="b5ForceChangePanel" class="security-card" style="display: none; border-top: 4px solid #C5221F;">
+            <h3 class="text-base font-extrabold text-[#C5221F] mb-1">🔒 Security Activation</h3>
+            <p class="text-xs text-gray-500 mb-5 leading-relaxed">To ensure your milestone points and vouchers are safe, please set up a new <b>permanent password</b>:</p>
+            
+            <form onsubmit="event.preventDefault(); submitNewPassword();" novalidate>
+                <!-- New Password -->
+                <div class="relative w-full">
+                    <input type="password" id="newCustomPassword" name="new-password" autocomplete="new-password" class="input-control has-icon" placeholder="New Password (At least 4 characters)" />
+                    <button type="button" onclick="togglePasswordVisibility('newCustomPassword', this)" class="absolute right-3 top-[14px] text-gray-400 hover:text-[#C5221F] focus:outline-none cursor-pointer">
+                        <i class="fa-solid fa-eye text-sm"></i>
+                    </button>
+                </div>
+
+                <!-- Confirm New Password -->
+                <div class="relative w-full">
+                    <input type="password" id="confirmCustomPassword" name="confirm-password" autocomplete="new-password" class="input-control has-icon" placeholder="Confirm New Password" />
+                    <button type="button" onclick="togglePasswordVisibility('confirmCustomPassword', this)" class="absolute right-3 top-[14px] text-gray-400 hover:text-[#C5221F] focus:outline-none cursor-pointer">
+                        <i class="fa-solid fa-eye text-sm"></i>
+                    </button>
+                </div>
+                
+                <button type="submit" class="btn-block btn-danger shadow-sm">Activate & Unlock Portal</button>
+            </form>
+            <p id="forcePassMessage" class="status-msg" style="display: none; color: #C5221F;"></p>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+       📦 Layer 2: Main B5 Dashboard View
+       ========================================================================= -->
+
+    <!-- Rules Modal Container -->
+    <div id="detailsModal" class="fixed inset-0 z-[110] bg-black/50 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl transform scale-95 transition-all duration-300" id="modalContainer">
+            <div class="flex justify-between items-center border-b border-gray-100 pb-3">
+                <h3 id="modalTitle" class="font-extrabold text-base text-[#633A11]">Rules & Details</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 cursor-pointer"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div id="modalBody" class="mt-4 text-xs text-gray-600 space-y-3 leading-relaxed"></div>
+        </div>
+    </div>
+
+    <!-- Top Sticky Header -->
+    <header class="bg-[#633A11] text-white px-5 py-4 sticky top-0 z-50 shadow-md flex justify-between items-center w-full select-none">
+        <div class="w-12"></div>
+        <h1 class="text-base font-bold flex items-center gap-2 tracking-wide">🎁 B5 Member Portal</h1>
+        <div class="w-12 flex justify-end items-center">
+            <div id="syncIndicator" class="opacity-0 transition-opacity duration-300 text-emerald-400 text-xs"><i class="fa-solid fa-rotate animate-spin"></i></div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="max-w-md md:max-w-6xl mx-auto px-4 mt-6">
+
+        <!-- Member Lookup -->
+        <div class="bg-white rounded-3xl p-6 border border-[#F2E4D4] premium-shadow max-w-md mx-auto" id="searchBox" style="display: none;">
+            <h3 id="searchTitle" class="text-base font-extrabold text-[#633A11] mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-magnifying-glass"></i> Member Lookup
+            </h3>
+            <div class="flex flex-col gap-3">
+                <input id="phone" type="text" placeholder="Phone Number" onblur="normalizePhone(this)" class="w-full bg-[#FAF6F0] border border-[#EADCC9] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#633A11] transition">
+                <input id="email" type="email" placeholder="Email" class="w-full bg-[#FAF6F0] border border-[#EADCC9] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#633A11] transition">
+                <button onclick="startManualSearch()" class="w-full bg-[#633A11] hover:bg-[#4A2B0C] text-white font-bold py-3 rounded-xl transition mt-2 shadow-md cursor-pointer">
+                    Search Profile
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard Output View -->
+        <div id="result" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start"></div>
+
+    </div>
+
+<!-- Reward Detail Modal -->
+<div id="rewardDetailModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-200">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-[#EADCC9] flex flex-col items-center text-center relative transform scale-95 transition-transform duration-200" id="rewardDetailCard">
+        <!-- Close Button -->
+        <button onclick="closeRewardDetailModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 w-8 h-8 rounded-full flex items-center justify-center transition">
+            <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+
+        <!-- Image Container -->
+        <div id="modalRewardImgContainer" class="w-full h-44 bg-[#FAF6F0] rounded-2xl flex items-center justify-center text-5xl overflow-hidden shadow-inner border border-[#EADCC9] mt-2">
+            <!-- JS 动态注入图片或 Emoji -->
+        </div>
+
+        <!-- Reward Info -->
+        <div class="mt-4 w-full">
+            <span class="inline-block px-3 py-1 bg-[#F5EADB] text-[#B87E31] font-black text-xs rounded-full mb-2" id="modalRewardPts">
+                0 Pts
+            </span>
+            <!-- 完整商品名称，允许折行显示完整 -->
+            <h3 class="font-extrabold text-base text-[#633A11] leading-snug break-words px-2" id="modalRewardTitle">
+                Item Title
+            </h3>
+        </div>
+
+        <!-- Confirm / Close Button -->
+        <button onclick="closeRewardDetailModal()" class="mt-6 w-full bg-[#633A11] hover:bg-[#4a2b0d] text-white font-bold py-3 rounded-2xl shadow-lg transition active:scale-95 text-xs">
+            Got it
+        </button>
+    </div>
+</div>
+
+<script>
+const APPS_SCRIPT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyw_wc2HirKbFq6Yn6sL2YC_SpXZb0J5K2Kd-k0uKYfRTwhXHg6sy_RbFzSYV6w8NCp5A/exec";
+
+let currentLoggedInIdentity = ""; 
+const isStaffMode = false;
+let autoRefreshTimer = null;
+let isCatalogExpanded = false;
+let cachedMemberData = null;
+
+// 👁️ 新增：控制密码可见性切换的函数
+function togglePasswordVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    const icon = btn.querySelector('i');
+    
+    if (!input || !icon) return;
+
+    if (input.type === "password") {
+        input.type = "text";
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        input.type = "password";
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const phoneParam = urlParams.get('phone');
+    const emailParam = urlParams.get('email');
+    
+    if (phoneParam || emailParam) {
+        const inputIdentity = document.getElementById("loginIdentity");
+        if (inputIdentity) {
+            inputIdentity.value = phoneParam || emailParam;
+            normalizeLoginIdentity(inputIdentity);
+        }
+    }
+});
+
+function normalizeLoginIdentity(input) {
+    if (!input) return;
+    let val = input.value.trim();
+    if (!val) return;
+    
+    if (/^\d+$/.test(val)) {
+        if (val.startsWith("0")) {
+            val = "6" + val;
+        } else if (!val.startsWith("60") && val.startsWith("1")) {
+            val = "60" + val;
+        }
+        input.value = val;
+    }
+}
+
+async function handleFrontendLogin() {
+    const inputIdentity = document.getElementById("loginIdentity");
+    normalizeLoginIdentity(inputIdentity);
+
+    const identity = inputIdentity.value.trim();
+    const password = document.getElementById("loginPassword").value.trim();
+    const msgEl = document.getElementById("loginMessage");
+
+    if (!identity || !password) {
+        showStatusMessage(msgEl, "Please fill in all fields.", "#C5221F");
+        return;
+    }
+
+    showStatusMessage(msgEl, "Verifying credentials... Please wait.", "#633A11");
+
+    try {
+        const url = `${APPS_SCRIPT_WEB_APP_URL}?mode=member_login&identity=${encodeURIComponent(identity)}&password=${encodeURIComponent(password)}`;
+        const response = await fetch(url);
+        const result = await response.json();
+
+        if (result.status === "ok") {
+            currentLoggedInIdentity = identity;
+
+            if (result.is_temporary === true) {
+                document.getElementById("b5LoginPanel").style.display = "none";
+                document.getElementById("b5ForceChangePanel").style.display = "block";
+            } else {
+                document.getElementById("b5SecurityGate").style.display = "none";
+                
+                if (result.data) {
+                    cachedMemberData = result.data;
+                    if (document.getElementById("searchBox")) document.getElementById("searchBox").style.display = "none";
+                    renderAllUI(cachedMemberData);
+                    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+                    autoRefreshTimer = setInterval(() => { silentUpdate(); }, 30000);
+                } else {
+                    searchProfileByIdentity(currentLoggedInIdentity, true);
+                }
+            }
+        } else if (result.status === "need_activation") {
+            showStatusMessage(msgEl, "💡 First time here? Click 'First Time Login / Forgot Password' below to receive your key via email.", "#B87E31");
+        } else {
+            showStatusMessage(msgEl, result.message || "Invalid credentials. Please check your username or password.", "#C5221F");
+        }
+    } catch (error) {
+        showStatusMessage(msgEl, "Server error. Please verify your internet connection.", "#C5221F");
+    }
+}
+
+// 1️⃣ 触发发送验证码（仅发送，不改动密码）
+async function triggerForgotPassword() {
+    const inputIdentity = document.getElementById("loginIdentity");
+    normalizeLoginIdentity(inputIdentity);
+
+    const identity = inputIdentity.value.trim();
+    const msgEl = document.getElementById("loginMessage");
+
+    if (!identity) {
+        showStatusMessage(msgEl, "⚠️ Please input your Phone Number or Email address first!", "#C5221F");
+        return;
+    }
+
+    showStatusMessage(msgEl, "Sending verification code to your email...", "#633A11");
+
+    try {
+        const url = `${APPS_SCRIPT_WEB_APP_URL}?mode=member_forgot_password&identity=${encodeURIComponent(identity)}`;
+        const response = await fetch(url);
+        const result = await response.json();
+
+        if (result.status === "ok") {
+            currentLoggedInIdentity = identity; // 锁定当前 Identity
+            
+            // 切换卡片：隐藏 Login，显示 Code 验证卡片
+            document.getElementById("b5LoginPanel").style.display = "none";
+            document.getElementById("b5VerifyCodePanel").style.display = "block";
+            
+            document.getElementById("emailAuthCode").value = "";
+            showStatusMessage(document.getElementById("verifyCodeMessage"), "", "");
+        } else {
+            showStatusMessage(msgEl, result.message || "Failed to send code.", "#C5221F");
+        }
+    } catch (error) {
+        showStatusMessage(msgEl, "Authentication service communication fault.", "#C5221F");
+    }
+}
+
+// 2️⃣ 提交验证码校验
+async function handleVerifyCode() {
+    const code = document.getElementById("emailAuthCode").value.trim();
+    const msgEl = document.getElementById("verifyCodeMessage");
+
+    if (!code || code.length !== 6) {
+        showStatusMessage(msgEl, "⚠️ Please enter a valid 6-digit verification code.", "#C5221F");
+        return;
+    }
+
+    showStatusMessage(msgEl, "Verifying code...", "#633A11");
+
+    try {
+        const url = `${APPS_SCRIPT_WEB_APP_URL}?mode=verify_auth_code&identity=${encodeURIComponent(currentLoggedInIdentity)}&code=${encodeURIComponent(code)}`;
+        const response = await fetch(url);
+        const result = await response.json();
+
+        if (result.status === "ok") {
+            // 验证通过，进入强制设置新密码界面！
+            document.getElementById("b5VerifyCodePanel").style.display = "none";
+            document.getElementById("b5ForceChangePanel").style.display = "block";
+        } else {
+            showStatusMessage(msgEl, result.message || "Invalid or expired code.", "#C5221F");
+        }
+    } catch (error) {
+        showStatusMessage(msgEl, "Verification service communication fault.", "#C5221F");
+    }
+}
+
+// 3️⃣ 返回登录界面
+function backToLoginPanel() {
+    document.getElementById("b5VerifyCodePanel").style.display = "none";
+    document.getElementById("b5ForceChangePanel").style.display = "none";
+    document.getElementById("b5LoginPanel").style.display = "block";
+}
+
+async function submitNewPassword() {
+    const newPass = document.getElementById("newCustomPassword").value.trim();
+    const confirmPass = document.getElementById("confirmCustomPassword").value.trim();
+    const passMsgEl = document.getElementById("forcePassMessage");
+
+    if (newPass.length < 4) {
+        showStatusMessage(passMsgEl, "Password must be at least 4 characters long.", "#C5221F");
+        return;
+    }
+    if (newPass !== confirmPass) {
+        showStatusMessage(passMsgEl, "Passwords do not match. Please re-verify.", "#C5221F");
+        return;
+    }
+
+    showStatusMessage(passMsgEl, "Syncing and encrypting credentials...", "#633A11");
+
+    try {
+        const url = `${APPS_SCRIPT_WEB_APP_URL}?mode=member_update_password&identity=${encodeURIComponent(currentLoggedInIdentity)}&new_password=${encodeURIComponent(newPass)}`;
+        const response = await fetch(url);
+        const result = await response.json();
+
+        if (result.status === "ok") {
+            alert("🎉 Profile Secured!\n\nYour permanent access password has been saved. Welcome to B5 Member Portal.");
+            document.getElementById("b5SecurityGate").style.display = "none";
+            
+            if (result.data) {
+                cachedMemberData = result.data;
+                if (document.getElementById("searchBox")) document.getElementById("searchBox").style.display = "none";
+                renderAllUI(cachedMemberData);
+                if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+                autoRefreshTimer = setInterval(() => { silentUpdate(); }, 30000);
+            } else {
+                searchProfileByIdentity(currentLoggedInIdentity, true);
+            }
+        } else {
+            showStatusMessage(passMsgEl, "Database sync restriction. Please try again.", "#C5221F");
+        }
+    } catch (error) {
+        showStatusMessage(passMsgEl, "Remote sync failed. Re-submitting payload...", "#C5221F");
+    }
+}
+
+function showStatusMessage(el, text, color) {
+    if (!el) return;
+    el.innerText = text;
+    el.style.color = color;
+    el.style.display = "block";
+}
+
+function toggleCatalogView() {
+    isCatalogExpanded = !isCatalogExpanded;
+    if(cachedMemberData) { renderAllUI(cachedMemberData); }
+}
+
+function resetPortal() {
+    if(autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+    location.reload();
+}
+
+function formatDateOnly(dateStr){
+    if(!dateStr) return "-";
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("en-CA");
+}
+
+function checkIsExpired(expiryStr) {
+    if(!expiryStr) return false;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const exp = new Date(expiryStr); exp.setHours(0,0,0,0);
+    return today > exp;
+}
+
+function normalizePhone(input){
+    if(!input) return;
+    let phone=input.value.replace(/[^0-9]/g,"");
+    if(phone.startsWith("0")) phone="6"+phone;
+    if(!phone.startsWith("60")) phone="60" + phone;
+    input.value=phone;
+}
+
+function startManualSearch() {
+    let phone=document.getElementById("phone") ? document.getElementById("phone").value.trim() : "";
+    let email=document.getElementById("email") ? document.getElementById("email").value.trim() : "";
+    let id = phone || email || currentLoggedInIdentity;
+    if(!id) return;
+    
+    currentLoggedInIdentity = id;
+    if(autoRefreshTimer) clearInterval(autoRefreshTimer);
+    searchProfileByIdentity(currentLoggedInIdentity, true);
+    autoRefreshTimer = setInterval(() => { silentUpdate(); }, 30000);
+}
+
+const renderActionBtnHtml = (isAvailable, isRedeemed, isExpired, uniqueId) => {
+    if (isExpired) return `<span id="${uniqueId}" class="text-[10px] text-red-500 font-extrabold bg-red-50 px-2 py-1 rounded-lg border border-red-200 select-none cursor-default">Expired</span>`;
+    if (isRedeemed) return `<span id="${uniqueId}" class="text-[10px] text-gray-400 font-bold bg-gray-100 px-2.5 py-1 rounded-lg select-none cursor-default">Used</span>`;
+    if (!isAvailable) return `<span id="${uniqueId}" class="text-[9px] text-gray-400 font-semibold bg-gray-50 px-2 py-1 rounded-lg border border-dashed select-none cursor-default">Locked</span>`;
+    
+    return `<span id="${uniqueId}" class="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-1 rounded-lg cursor-default select-none">Available</span>`;
+};
+
+async function searchProfileByIdentity(identity, showLoading = false){
+    if(!identity) return;
+
+    if(showLoading && document.getElementById("result")) {
+        document.getElementById("result").innerHTML="<div class='col-span-full text-center py-10 text-[#8C745A] font-medium'><i class='fa-solid fa-circle-notch animate-spin mr-2'></i>Loading Profile...</div>";
+    }
+
+    let url = `${APPS_SCRIPT_WEB_APP_URL}?mode=member`;
+    if (identity.includes("@")) {
+        url += "&email=" + encodeURIComponent(identity);
+    } else {
+        url += "&phone=" + encodeURIComponent(identity);
+    }
+
+    try {
+        let res=await fetch(url);
+        let data=await res.json();
+        if(data.status !== "ok") {
+            if(document.getElementById("result")) {
+                document.getElementById("result").innerHTML="<div class='col-span-full bg-white border border-[#F2E4D4] rounded-2xl p-6 text-center text-[#8C745A] premium-shadow max-w-md mx-auto'>No member record found</div>";
+            }
+            return;
+        }
+
+        cachedMemberData = data.data;
+        if(document.getElementById("searchBox")) document.getElementById("searchBox").style.display="none";
+        renderAllUI(cachedMemberData);
+
+    } catch(err) { console.error("Identity query error:", err); }
+}
+
+function renderAllUI(m) {
+    if (!m) return;
+
+    const voucherScrollBox = document.getElementById("voucherScrollContainer");
+    const savedScrollLeft = voucherScrollBox ? voucherScrollBox.scrollLeft : 0;
+
+    const stamp = m.stamp || { current: 0, limit: 7 };
+    const referral = m.referral || { total: 0, tier: "Member" };
+    const settings = m.settings || {};
+    const points = m.points || { balance: 0, expiry: "-" };
+
+    const th3 = parseInt(settings.referralMilestone3Threshold || "1");
+    const th6 = parseInt(settings.referralMilestone6Threshold || "2");
+    const th9 = parseInt(settings.referralMilestone9Threshold || "3");
+    
+    const t10 = parseInt(settings.referralTier10Threshold || "4");
+    const t20 = parseInt(settings.referralTier20Threshold || "5");
+    const t35 = parseInt(settings.referralTier35Threshold || "6");
+    const t50 = parseInt(settings.referralTier50Threshold || "7");
+
+    let tierName = `👤 ${settings.referralTier0Name || "Member"}`;
+    let tierDiscount = `${settings.referralTier0Discount || "0%"}`; 
+    let tierRewardHtml = "";
+
+    if (referral.total >= t50) { 
+        tierName = `💎 ${settings.referralTier50Name || "Platinum"}`;
+        tierDiscount = `${settings.referralTier50Discount || "20%"}`;
+        tierRewardHtml = `
+            <div class="mt-4 p-3 bg-black/20 rounded-xl border border-white/10 flex justify-between items-center text-left">
+                <div>
+                    <div class="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider">🎁 Monthly Platinum Reward</div>
+                    <div class="text-base font-black text-white mt-0.5">${settings.referralTier50Discount || "Platinum Reward"}</div>
+                </div>
+                <div id="box-tier50" class="scale-110 shrink-0">${renderActionBtnHtml(true, !!m.tier50_redeemed, false, 'btn-tier50')}</div>
+            </div>`;
+    }
+    else if (referral.total >= t35) { 
+        tierName = `🥇 ${settings.referralTier35Name || "Gold"}`;
+        tierDiscount = `${settings.referralTier35Discount || "15%"}`;
+        tierRewardHtml = `
+            <div class="mt-4 p-3 bg-black/20 rounded-xl border border-white/10 flex justify-between items-center text-left">
+                <div>
+                    <div class="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider">🎁 Monthly Gold Reward</div>
+                    <div class="text-base font-black text-white mt-0.5">${settings.referralTier35Discount || "Gold Reward"}</div>
+                </div>
+                <div id="box-tier35" class="scale-110 shrink-0">${renderActionBtnHtml(true, !!m.tier35_redeemed, false, 'btn-tier35')}</div>
+            </div>`;
+    }
+    else if (referral.total >= t20) { 
+        tierName = `🥈 ${settings.referralTier20Name || "Silver"}`;
+        tierDiscount = `${settings.referralTier20Discount || "10%"}`;
+        tierRewardHtml = `
+            <div class="mt-4 p-3 bg-black/20 rounded-xl border border-white/10 flex justify-between items-center text-left">
+                <div>
+                    <div class="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider">🎁 Monthly Silver Reward</div>
+                    <div class="text-base font-black text-white mt-0.5">${settings.referralTier20Discount || "Silver Reward"}</div>
+                </div>
+                <div id="box-tier20" class="scale-110 shrink-0">${renderActionBtnHtml(true, !!m.tier20_redeemed, false, 'btn-tier20')}</div>
+            </div>`;
+    }
+    else if (referral.total >= t10) { 
+        tierName = `🥉 ${settings.referralTier10Name || "Bronze"}`;
+        tierDiscount = `${settings.referralTier10Discount || "5%"}`;
+        tierRewardHtml = `
+            <div class="mt-4 p-3 bg-black/20 rounded-xl border border-white/10 flex justify-between items-center text-left">
+                <div>
+                    <div class="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider">🎁 Monthly Bronze Reward</div>
+                    <div class="text-base font-black text-white mt-0.5">${settings.referralTier10Discount || "Bronze Reward"}</div>
+                </div>
+                <div id="box-tier10" class="scale-110 shrink-0">${renderActionBtnHtml(true, !!m.tier10_redeemed, false, 'btn-tier10')}</div>
+            </div>`;
+    }
+    else {
+        tierRewardHtml = `
+            <div class="mt-4 p-2 bg-black/10 rounded-xl text-center text-xs text-amber-200/60 italic">
+                Invite ${t10 - referral.total} more friends to unlock Monthly Tier Rewards!
+            </div>`;
+    }
+
+    const spinExp = checkIsExpired(m.reward?.expiry);
+    const bdayExp = checkIsExpired(m.birthdayReward?.expiry);
+    const promoExp = checkIsExpired(m.promoReward?.expiry);
+
+    const isStamp3UnlockedAndAvailable = (stamp.current >= 3 && !m.stamp3_redeemed);
+    const isStamp7UnlockedAndAvailable = (stamp.current >= 7 && !m.stamp7_redeemed);
+
+    const milestones = [th3, th6, th9, t10, t20, t35, t50];
+
+    const stampNodesHtml = Array.from({ length: stamp.limit }).map((_, i) => {
+        const stampNum = i + 1;
+        const isDone = i < stamp.current;
+        const isRewardNode = (stampNum === 3 || stampNum === 7);
+        let nodeInnerHtml = `<span>${isDone ? '☕' : stampNum}</span>`;
+        let extraNodeClass = "";
+
+        if (isRewardNode) {
+            if (stampNum === 3) {
+                if (isStamp3UnlockedAndAvailable) {
+                    nodeInnerHtml = `<span class="gift-bounce text-xl relative -top-0.5">🎁</span>`;
+                    extraNodeClass = "bg-amber-100 text-white border-none scale-125 z-20";
+                } else if (m.stamp3_redeemed) {
+                    nodeInnerHtml = `<span class="text-[10px]">☕</span>`;
+                    extraNodeClass = "bg-[#633A11] text-white";
+                } else {
+                    nodeInnerHtml = `<span class="opacity-30 text-xs">🎁</span>`;
+                    extraNodeClass = "bg-gray-100 text-gray-400 border-gray-300";
+                }
+            } else if (stampNum === 7) {
+                if (isStamp7UnlockedAndAvailable) {
+                    nodeInnerHtml = `<span class="gift-bounce text-xl relative -top-0.5">🎁</span>`;
+                    extraNodeClass = "bg-amber-100 text-white border-none scale-125 z-20";
+                } else if (m.stamp7_redeemed) {
+                    nodeInnerHtml = `<span class="text-[10px]">☕</span>`;
+                    extraNodeClass = "bg-[#633A11] text-white";
+                } else {
+                    nodeInnerHtml = `<span class="opacity-30 text-xs">🎁</span>`;
+                    extraNodeClass = "bg-gray-100 text-gray-400 border-gray-300";
+                }
+            }
+        } else {
+            extraNodeClass = isDone ? 'bg-[#633A11] text-white shadow-sm scale-110' : 'bg-white text-[#CFCFCF] border-dashed border-[#CFCFCF]';
+        }
+        return `<div class="flex flex-col items-center gap-1 z-10"><div class="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black transition-all duration-300 border ${extraNodeClass}">${nodeInnerHtml}</div></div>`;
+    }).join("");
+
+    let htmlContent = `
+        <div class="col-span-full flex justify-between items-center mt-2">
+            <button onclick="resetPortal()" class="bg-white border border-[#EADCC9] text-[#633A11] text-xs font-bold px-4 py-2 rounded-xl transition premium-shadow flex items-center gap-1.5 cursor-pointer">
+                <i class="fa-solid fa-arrow-left"></i> Logout / Exit
+            </button>
+        </div>
+
+        <div class="col-span-full flex justify-between items-center mt-2 mb-1 px-1">
+            <div class="text-xs text-[#8C745A] font-medium flex items-center gap-1.5">
+                <span>Account secured</span>
+                <div id="syncIndicator" class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse opacity-0 transition-opacity duration-300"></div>
+            </div>
+            <button id="manualRefreshBtn" onclick="triggerManualRefresh()" class="bg-white hover:bg-amber-50/50 text-[#633A11] text-[11px] font-bold px-3 py-1.5 rounded-xl border border-[#EADCC9]/60 shadow-sm transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer">
+                <i class="fa-solid fa-arrows-rotate text-xs"></i><span>Refresh Data</span>
+            </button>
+        </div>
+
+        <!-- 👤 Profile 卡片专区 -->
+        <section onclick="openProfileModal()" class="bg-[#633A11] text-[#FAF6F0] rounded-3xl p-6 premium-shadow relative overflow-hidden flex flex-col justify-between min-h-[250px] lg:col-span-1 cursor-pointer hover:scale-[1.01] transition-transform duration-200">
+            <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-[#B87E31] opacity-20 rounded-full blur-2xl"></div>
+            
+            <div class="flex justify-between items-start z-10 gap-2">
+                <div class="flex flex-col">
+                    <span class="text-xs font-bold text-[#C2B2A2] tracking-widest uppercase">Available Points</span>
+                    <div class="flex items-baseline gap-1.5 mt-1">
+                        <span id="livePoints" class="text-5xl font-extrabold text-white">${points.balance}</span>
+                        <span class="text-xs font-extrabold text-amber-400 uppercase tracking-wider">Pts</span>
+                    </div>
+                </div>
+                <div onclick="event.stopPropagation(); openModal('tier')" class="bg-[#4A2B0C] px-3 py-2 rounded-xl text-right cursor-pointer hover:bg-[#3d2309] transition border border-white/5 shrink-0">
+                    <div class="text-xs font-black text-white tracking-wide flex items-center gap-1 justify-end">${tierName} <i class="fa-solid fa-circle-info text-[10px] text-amber-400"></i></div>
+                    <div class="text-[10px] font-bold text-amber-400">${tierDiscount}</div>
+                </div>
+            </div>
+
+            <div class="z-10 mt-2" onclick="event.stopPropagation();">
+                ${tierRewardHtml}
+            </div>
+
+            <div class="flex justify-between items-end border-t border-[#4A2B0C] pt-4 z-10 mt-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-[#4A2B0C] rounded-full flex items-center justify-center text-base font-bold text-amber-400">
+                        ${(m.profile?.name ? m.profile.name.charAt(0).toUpperCase() : 'B')}
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-white tracking-wide">${m.profile?.name || "-"}</h2>
+                        <p class="text-[11px] text-[#C2B2A2]"><i class="fa-solid fa-phone text-[10px] mr-1"></i>${m.profile?.phone || "-"}</p>
+                    </div>
+                </div>
+                <div class="text-right text-[10px] text-[#C2B2A2] flex flex-col items-end gap-1">
+                    <span class="bg-white/10 px-2 py-0.5 rounded-md text-[9px] font-bold">View Profile <i class="fa-solid fa-chevron-right text-[8px]"></i></span>
+                    <p>Valid Till: ${points.expiry || "-"}</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 🎁 优惠券专区 -->
+        <section class="bg-white rounded-3xl p-5 border border-[#F2E4D4] premium-shadow lg:col-span-2">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-extrabold text-xs text-[#633A11] uppercase tracking-wider">🎁 Your Vouchers</h3>
+                <span class="text-[11px] text-[#8C745A] font-semibold md:hidden flex items-center gap-1">Swipe <i class="fa-solid fa-arrow-right text-[9px]"></i></span>
+            </div>
+            <div id="voucherScrollContainer" class="flex md:grid md:grid-cols-3 gap-4 overflow-x-auto pb-1 no-scrollbar snap-x">
+                
+                <!-- 1. SPIN 卡片 -->
+                <div class="min-w-[250px] md:min-w-0 bg-[#FAF6F0] border border-[#EADCC9] rounded-2xl p-4 flex flex-col justify-between snap-start shadow-sm">
+                    <div class="flex justify-between items-start gap-2">
+                        <div class="flex-1 min-w-0">
+                            <span class="text-[9px] bg-[#E8DDFF] text-[#6200EE] font-black px-2 py-0.5 rounded-md tracking-wider uppercase">SPIN</span>
+                            <h4 class="font-extrabold text-sm text-[#633A11] mt-1.5 whitespace-normal break-words leading-tight">${m.reward?.name || "Not Issued"}</h4>
+                        </div>
+                        <div class="w-12 h-12 shrink-0 rounded-xl bg-[#E8DDFF]/40 flex items-center justify-center text-2xl select-none">🎡</div>
+                    </div>
+                    
+                    <div class="mt-3 pt-2 border-t border-[#EADCC9]/40 flex flex-col gap-1.5">
+                        <div class="flex justify-between items-center text-[10px] bg-white/60 px-2 py-1 rounded-lg border border-[#EADCC9]/50">
+                            <span class="text-gray-400 font-bold">Code:</span>
+                            <span class="font-mono font-extrabold text-[#6200EE] select-all">${m.reward?.token || "-"}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-[9px] text-gray-400">Exp: ${formatDateOnly(m.reward?.expiry)}</span>
+                            <div id="box-spin">${!(m.reward?.token) ? `<span class="text-xs text-gray-400 font-bold">-</span>` : renderActionBtnHtml(!spinExp, (m.reward?.status || "").includes("Redeem"), spinExp, 'btn-spin')}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. BIRTHDAY 卡片 -->
+                <div class="min-w-[250px] md:min-w-0 bg-[#FAF6F0] border border-[#EADCC9] rounded-2xl p-4 flex flex-col justify-between snap-start shadow-sm">
+                    <div class="flex justify-between items-start gap-2">
+                        <div class="flex-1 min-w-0">
+                            <span class="text-[9px] bg-[#FCE8E6] text-[#C5221F] font-black px-2 py-0.5 rounded-md tracking-wider uppercase">BDAY</span>
+                            <h4 class="font-extrabold text-sm text-[#633A11] mt-1.5 whitespace-normal break-words leading-tight">${m.birthdayReward?.reward || "Not Available"}</h4>
+                        </div>
+                        <div class="w-12 h-12 shrink-0 rounded-xl bg-[#FCE8E6]/40 flex items-center justify-center text-2xl select-none">🎂</div>
+                    </div>
+                    
+                    <div class="mt-3 pt-2 border-t border-[#EADCC9]/40 flex flex-col gap-1.5">
+                        <div class="flex justify-between items-center text-[10px] bg-white/60 px-2 py-1 rounded-lg border border-[#EADCC9]/50">
+                            <span class="text-gray-400 font-bold">Code:</span>
+                            <span class="font-mono font-extrabold text-[#C5221F] select-all">${m.birthdayReward?.token || "-"}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-[9px] text-gray-400">Exp: ${formatDateOnly(m.birthdayReward?.expiry)}</span>
+                            <div id="box-birthday">${!(m.birthdayReward?.token) ? `<span class="text-xs text-gray-400 font-bold">-</span>` : renderActionBtnHtml(!bdayExp, (m.birthdayReward?.status || "").includes("Redeem"), bdayExp, 'btn-birthday')}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. PROMO 卡片 -->
+                <div class="min-w-[250px] md:min-w-0 bg-[#FAF6F0] border border-[#EADCC9] rounded-2xl p-4 flex flex-col justify-between snap-start shadow-sm">
+                    <div class="flex justify-between items-start gap-2">
+                        <div class="flex-1 min-w-0">
+                            <span class="text-[9px] bg-[#E8F0FE] text-[#1A73E8] font-black px-2 py-0.5 rounded-md tracking-wider uppercase">PROMO</span>
+                            <h4 class="font-extrabold text-sm text-[#633A11] mt-1.5 whitespace-normal break-words leading-tight">${m.promoReward?.reward || "Not Available"}</h4>
+                        </div>
+                        <div class="w-12 h-12 shrink-0 rounded-xl bg-[#E8F0FE]/40 flex items-center justify-center text-2xl select-none">🎉</div>
+                    </div>
+                    
+                    <div class="mt-3 pt-2 border-t border-[#EADCC9]/40 flex flex-col gap-1.5">
+                        <div class="flex justify-between items-center text-[10px] bg-white/60 px-2 py-1 rounded-lg border border-[#EADCC9]/50">
+                            <span class="text-gray-400 font-bold">Code:</span>
+                            <span class="font-mono font-extrabold text-[#1A73E8] select-all">${m.promoReward?.token || "-"}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-[9px] text-gray-400">Exp: ${formatDateOnly(m.promoReward?.expiry)}</span>
+                            <div id="box-promo">${!(m.promoReward?.token) ? `<span class="text-xs text-gray-400 font-bold">-</span>` : renderActionBtnHtml(!promoExp, (m.promoReward?.status || "").includes("Redeem"), promoExp, 'btn-promo')}</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ☕ 印章卡专区 -->
+        <section class="bg-white rounded-3xl p-5 border border-[#F2E4D4] premium-shadow lg:col-span-1">
+            <div class="flex justify-between items-center mb-1">
+                <h3 class="font-extrabold text-xs text-[#633A11] uppercase tracking-wider">☕ Monthly Visit Stamp</h3>
+                <button onclick="openModal('stamp')" class="text-gray-400 hover:text-[#633A11] text-xs font-semibold flex items-center gap-1 cursor-pointer">ⓘ Rules</button>
+            </div>
+            <div class="text-xs font-extrabold text-[#B87E31] bg-amber-50 border border-amber-200/60 rounded-xl px-3 py-2 mb-4 flex justify-between items-center">
+                <span>Progress Tracker:</span><span class="text-sm font-black">${stamp.current} / ${stamp.limit}</span>
+            </div>
+            <div class="bg-[#FAF6F0] p-4 rounded-2xl border border-[#EADCC9] mb-4">
+                <div class="flex justify-between items-center relative">
+                    <div class="absolute left-2 right-2 h-[2px] bg-[#EADCC9] top-4 z-0"></div>
+                    <div class="absolute left-2 h-[2px] bg-[#633A11] top-4 z-0" style="width: ${Math.min(((stamp.current - 1) / (stamp.limit - 1)) * 100, 100)}%;"></div>
+                    ${stampNodesHtml}
+                </div>
+            </div>
+            <div class="flex flex-col gap-2">
+                <div class="flex justify-between items-center bg-[#FAF6F0] p-3 rounded-xl border border-[#EADCC9] text-xs">
+                    <div>
+                        <span class="font-bold text-[#633A11] flex items-center gap-1.5"><span class="${isStamp3UnlockedAndAvailable ? 'gift-bounce text-base' : 'opacity-30'}">🎁</span> 3 Stamps Reward</span>
+                        <p class="text-[11px] text-gray-500 mt-0.5">${settings.stampReward3 || "-"}</p>
+                    </div>
+                    <div id="box-stamp3">${renderActionBtnHtml(stamp.current >= 3, m.stamp3_redeemed, false, 'btn-stamp3')}</div>
+                </div>
+                <div class="flex justify-between items-center bg-[#FAF6F0] p-3 rounded-xl border border-[#EADCC9] text-xs">
+                    <div>
+                        <span class="font-bold text-[#633A11] flex items-center gap-1.5"><span class="${isStamp7UnlockedAndAvailable ? 'gift-bounce text-base' : 'opacity-30'}">🎁</span> 7 Stamps Reward</span>
+                        <p class="text-[11px] text-gray-500 mt-0.5">${settings.stampReward7 || "-"}</p>
+                    </div>
+                    <div id="box-stamp7">${renderActionBtnHtml(stamp.current >= 7, m.stamp7_redeemed, false, 'btn-stamp7')}</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 👥 推荐路程专区 -->
+        <section class="bg-white rounded-3xl p-5 border border-[#F2E4D4] premium-shadow lg:col-span-2">
+            <div class="flex justify-between items-center mb-1">
+                <h3 class="font-extrabold text-xs text-[#633A11] uppercase tracking-wider">👥 Referral Journey</h3>
+                <button onclick="openModal('referral_details')" class="text-gray-400 hover:text-[#633A11] text-xs font-semibold flex items-center gap-1 cursor-pointer">ⓘ Details</button>
+            </div>
+            <div class="flex justify-between items-center bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-100 text-xs mt-2 mb-3">
+                <span class="font-bold text-emerald-800">Total Friends Invited:</span>
+                <span class="text-sm font-black text-emerald-600">${referral.total} Users</span>
+            </div>
+            <div class="my-4 mx-1">
+                <div class="h-4 bg-gray-100 border border-gray-200/50 rounded-full overflow-hidden p-0.5 shadow-inner relative">
+                    <div class="bg-emerald-500 h-full rounded-full transition-all duration-500 shadow-sm flex items-center justify-end px-2" style="width: ${Math.min((referral.total / t50) * 100, 100)}%">
+                        ${referral.total > 0 ? `<span class="text-[9px] text-white font-black">${Math.min(Math.round((referral.total/t50)*100), 100)}%</span>` : ''}
+                    </div>
+                </div>
+                <div class="flex justify-between items-center mt-2 px-1 text-[10px] font-extrabold">
+                    ${milestones.map(num => {
+                        const isReached = referral.total >= num;
+                        const lightClass = isReached ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-100 scale-110' : 'bg-gray-100 text-gray-400 border border-gray-200';
+                        return `<div class="flex flex-col items-center"><span class="w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300 ${lightClass}">${num}</span></div>`;
+                    }).join("")}
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs mt-4">
+                <div class="flex justify-between items-center p-3 bg-[#FAF6F0] border border-[#EADCC9] rounded-xl">
+                    <div>
+                        <span class="font-bold text-[#633A11] flex items-center gap-1.5"><span class="${(referral.total >= th3 && !m.ref3_redeemed) ? 'gift-bounce text-base' : 'opacity-30'}">🎁</span> ${th3} Referrals</span>
+                        <p class="text-[11px] text-gray-500 mt-0.5 line-clamp-1">${settings.referralMilestone3 || "-"}</p>
+                    </div>
+                    <div id="box-ref3">${renderActionBtnHtml(referral.total >= th3, m.ref3_redeemed, false, 'btn-ref3')}</div>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-[#FAF6F0] border border-[#EADCC9] rounded-xl">
+                    <div>
+                        <span class="font-bold text-[#633A11] flex items-center gap-1.5"><span class="${(referral.total >= th6 && !m.ref6_redeemed) ? 'gift-bounce text-base' : 'opacity-30'}">🎁</span> ${th6} Referrals</span>
+                        <p class="text-[11px] text-gray-500 mt-0.5 line-clamp-1">${settings.referralMilestone6 || "-"}</p>
+                    </div>
+                    <div id="box-ref6">${renderActionBtnHtml(referral.total >= th6, m.ref6_redeemed, false, 'btn-ref6')}</div>
+                </div>
+                <div class="flex justify-between items-center p-3 bg-[#FAF6F0] border border-[#EADCC9] rounded-xl">
+                    <div>
+                        <span class="font-bold text-[#633A11] flex items-center gap-1.5"><span class="${(referral.total >= th9 && !m.ref9_redeemed) ? 'gift-bounce text-base' : 'opacity-30'}">🎁</span> ${th9} Referrals</span>
+                        <p class="text-[11px] text-gray-500 mt-0.5 line-clamp-1">${settings.referralMilestone9 || "-"}</p>
+                    </div>
+                    <div id="box-ref9">${renderActionBtnHtml(referral.total >= th9, m.ref9_redeemed, false, 'btn-ref9')}</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 🛍️ 兑换商品专区 -->
+        <section class="bg-white rounded-3xl p-5 border border-[#F2E4D4] premium-shadow col-span-full">
+            <div class="flex justify-between items-center mb-3.5"><h3 class="font-extrabold text-xs text-[#633A11] uppercase tracking-wider">🛍️ Rewards Catalog</h3></div>
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" id="catalogGrid">${renderCatalogTier(m.catalog || [], points.balance)}</div>
+        </section>
+
+        <!-- 📜 兑换历史专区 -->
+        <section class="bg-white rounded-3xl p-5 border border-[#F2E4D4] premium-shadow col-span-full">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-extrabold text-xs text-[#633A11] uppercase tracking-wider">📜 Redemption History (Last 5)</h3>
+            </div>
+            <div id="redeemHistoryContainer" class="space-y-2"></div>
+        </section>
+    `;
+
+    document.getElementById("result").innerHTML = htmlContent;
+    const newVoucherScrollBox = document.getElementById("voucherScrollContainer");
+    if(newVoucherScrollBox) { newVoucherScrollBox.scrollLeft = savedScrollLeft; }
+
+    renderRedeemHistoryUI(m.redeemHistory || m.history || []);
+}
+
+function openModal(type, latestSettings = null) {
+    const modal = document.getElementById("detailsModal");
+    const container = document.getElementById("modalContainer");
+    const title = document.getElementById("modalTitle");
+    const body = document.getElementById("modalBody");
+    
+    const s = latestSettings || cachedMemberData?.settings || {};
+    
+    if(type === 'stamp') {
+        title.innerHTML = "📊 Stamp Card Policy";
+        body.innerHTML = `
+            <ul class="list-disc pl-4 space-y-2 font-medium text-gray-700">
+                <li class="text-red-600 font-bold">🔄 Monthly Visit Stamps reset automatically on the 1st day of every month!</li>
+                <li>Each valid counter check-in grants you 1 visit stamp.</li>
+                <li>Unlock milestone rewards when you collect 3 and 7 stamps within the calendar month.</li>
+            </ul>`;
+    } else if(type === 'tier' || type === 'referral_details') {
+        
+        const th3 = parseInt(s.referralMilestone3Threshold || "3");
+        const th6 = parseInt(s.referralMilestone6Threshold || "6");
+        const th9 = parseInt(s.referralMilestone9Threshold || "9");
+
+        const limit10 = parseInt(s.referralTier10Threshold || "10");
+        const limit20 = parseInt(s.referralTier20Threshold || "20");
+        const limit35 = parseInt(s.referralTier35Threshold || "35");
+        const limit50 = parseInt(s.referralTier50Threshold || "50");
+
+        const name0  = s.referralTier0Name || "Member";
+        const name10 = s.referralTier10Name || "Bronze";
+        const name20 = s.referralTier20Name || "Silver";
+        const name35 = s.referralTier35Name || "Gold";
+        const name50 = s.referralTier50Name || "Platinum";
+
+        const disc0  = s.referralTier0Discount || "0";
+        const disc10 = s.referralTier10Discount || "5";
+        const disc20 = s.referralTier20Discount || "10";
+        const disc35 = s.referralTier35Discount || "15";
+        const disc50 = s.referralTier50Discount || "20";
+
+        title.innerHTML = "👥 Referral Journey Milestones";
+        body.innerHTML = `
+            <div class="space-y-3">
+                <p class="font-bold text-gray-600 text-xs">Invite friends to unlock direct rewards and discounts:</p>
+                <div class="border-t border-gray-100 pt-2 space-y-2 text-xs">
+                    
+                    <div class="bg-[#FAF6F0] p-2 rounded-xl border border-[#EADCC9]/50">
+                        <span class="font-extrabold text-[#633A11]">👤 0-${limit10 - 1} Invites:</span> ${name0} (${disc0}% Off)
+                    </div>
+                    
+                    <div class="bg-amber-50 p-2 rounded-xl border border-amber-200/50">
+                        <span class="font-extrabold text-amber-800">🥉 ${th3} & ${th6} & ${th9} Invites Milestone Rewards:</span>
+                        <div class="mt-1 space-y-0.5">
+                            <p class="text-gray-500">🎁 ${th3} Ref: ${s.referralMilestone3 || "-"}</p>
+                            <p class="text-gray-500">🎁 ${th6} Ref: ${s.referralMilestone6 || "-"}</p>
+                            <p class="text-gray-500">🎁 ${th9} Ref: ${s.referralMilestone9 || "-"}</p>
+                        </div>
+                        <p class="text-amber-700 font-bold mt-1">✨ Hit ${limit10} Invites to unlock ${name10} Tier (${disc10}%)</p>
+                    </div>
+                    
+                    <div class="bg-slate-50 p-2 rounded-xl border border-slate-200/50">
+                        <span class="font-extrabold text-slate-800">🥈 ${limit20}+ Invites (${name20} Tier):</span> ${disc20}%
+                        <p class="text-gray-500 mt-1">🎁 Milestone Reward: ${s.referralMilestone20 || "-"}</p>
+                    </div>
+                    
+                    <div class="bg-yellow-50 p-2 rounded-xl border border-yellow-200/50">
+                        <span class="font-extrabold text-yellow-800">🥇 ${limit35}+ Invites (${name35} Tier):</span> ${disc35}%
+                        <p class="text-gray-500 mt-1">🎁 Milestone Reward: ${s.referralMilestone35 || "-"}</p>
+                    </div>
+                    
+                    <div class="bg-cyan-50 p-2 rounded-xl border border-cyan-200/50">
+                        <span class="font-extrabold text-cyan-800">💎 ${limit50}+ Invites (${name50} Tier):</span> ${disc50}%
+                        <p class="text-gray-500 mt-1">🎁 Milestone Reward: ${s.referralMilestone50 || "-"}</p>
+                    </div>
+                </div>
+            </div>`;
+    }
+    modal.classList.remove("opacity-0", "pointer-events-none");
+    container.classList.remove("scale-95");
+}
+
+function openProfileModal(latestProfile = null) {
+    const modal = document.getElementById("detailsModal");
+    const container = document.getElementById("modalContainer");
+    const title = document.getElementById("modalTitle");
+    const body = document.getElementById("modalBody");
+    
+    const p = latestProfile || cachedMemberData?.profile;
+    
+    if (!p) return;
+    
+    title.innerHTML = "👤 My Member Profile";
+    body.innerHTML = `
+        <div class="space-y-4">
+            <div class="flex flex-col items-center justify-center py-2 bg-[#FAF6F0] rounded-2xl border border-[#EADCC9]/50">
+                <div class="w-14 h-14 bg-[#633A11] rounded-full flex items-center justify-center text-xl font-bold text-amber-400 shadow-md">
+                    ${(p.name ? p.name.charAt(0).toUpperCase() : 'B')}
+                </div>
+                <h4 class="font-extrabold text-base text-[#633A11] mt-2">${p.name || "-"}</h4>
+                <p class="text-[11px] text-[#8C745A] font-medium">B5 Cuisine Verified Member</p>
+            </div>
+            <div class="space-y-2 text-xs">
+                <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span class="text-gray-400 font-medium"><i class="fa-solid fa-phone w-4"></i> Phone Number</span>
+                    <span class="font-bold text-[#633A11]">${p.phone || "-"}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span class="text-gray-400 font-medium"><i class="fa-solid fa-envelope w-4"></i> Email Address</span>
+                    <span class="font-bold text-[#633A11] break-all max-w-[180px] text-right">${p.email || "-"}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span class="text-gray-400 font-medium"><i class="fa-solid fa-cake-candles w-4"></i> Birthday</span>
+                    <span class="font-bold text-[#633A11]">${p.birthday || "-"}</span>
+                </div>
+            </div>
+            <div class="bg-amber-50 p-3 rounded-xl border border-amber-200/44 text-[11px] text-amber-800 leading-relaxed text-center">
+                🔒 To protect your rewards, profiling updates are locked. Please contact our counter staff if you need to change your registered mobile or email.
+            </div>
+        </div>`;
+    
+    modal.classList.remove("opacity-0", "pointer-events-none");
+    container.classList.remove("scale-95");
+}
+
+function closeModal() {
+    const modal = document.getElementById("detailsModal");
+    const container = document.getElementById("modalContainer");
+    modal.classList.add("opacity-0", "pointer-events-none");
+    container.classList.add("scale-95");
+}
+
+function renderCatalogTier(catalog, currentPoints){
+    if(!catalog || !catalog.length) return "<div class='col-span-full text-center py-4 text-xs text-gray-400'>No items available</div>";
+    
+    const isMobile = window.innerWidth < 768;
+    const slicedCatalog = (!isCatalogExpanded && isMobile) ? catalog.slice(0, 4) : catalog;
+    let html = "";
+    
+    slicedCatalog.forEach((item, index) => {
+        const canRedeem = currentPoints >= item.points;
+        const diff = item.points - currentPoints;
+        let actionAreaHtml = "";
+        
+        if(canRedeem) {
+            actionAreaHtml = `<div class="w-full bg-emerald-100 text-emerald-800 text-[11px] py-1.5 rounded-xl font-extrabold text-center">Available</div>`;
+        } else {
+            actionAreaHtml = `<div class="w-full bg-gray-200/60 text-gray-400 text-center text-[10px] py-1.5 rounded-xl font-bold">Need ${diff} Pts</div>`;
+        }
+        
+        // 转义字符串防止单双引号导致 JS 报错
+        const safeRewardName = (item.reward || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        const safeImg = (item.image || '').replace(/'/g, "\\'");
+
+        html += `
+            <div onclick="openRewardDetailModal('${safeRewardName}', '${item.points}', '${safeImg}')" 
+                 class="bg-[#FAF6F0] rounded-2xl p-3 flex flex-col justify-between border border-[#EADCC9] shadow-sm cursor-pointer hover:shadow-md transition-all active:scale-[0.98]">
+                <div>
+                    <div class="w-full h-24 bg-white rounded-xl flex items-center justify-center text-3xl overflow-hidden relative shadow-inner">
+                        ${item.image ? `<img class="w-full h-full object-cover" src="${item.image}">` : "🎁"}
+                    </div>
+                    <div class="mt-2.5">
+                        <h4 class="font-extrabold text-xs text-[#633A11] tracking-tight line-clamp-1" title="${safeRewardName}">${item.reward}</h4>
+                        <p class="text-xs font-black text-[#B87E31] mt-0.5">${item.points} Pts</p>
+                    </div>
+                </div>
+                <div class="mt-3" id="box-catalog-${index}">${actionAreaHtml}</div>
+            </div>`;
+    });
+
+    if (isMobile && catalog.length > 4) {
+        html += `
+            <div class="col-span-full pt-2">
+                <button onclick="toggleCatalogView()" class="w-full bg-gray-100 hover:bg-gray-200/70 text-[#633A11] text-xs font-bold py-2 rounded-xl transition flex items-center justify-center gap-1 border border-gray-200/40 cursor-pointer">
+                    <span>${isCatalogExpanded ? 'Collapse Items' : `View All Store Items (${catalog.length})`}</span>
+                    <i class="fa-solid ${isCatalogExpanded ? 'fa-chevron-up' : 'fa-chevron-down'} text-[10px]"></i>
+                </button>
+            </div>`;
+    }
+    return html;
+}
+
+async function triggerManualRefresh() {
+    const refreshBtn = document.getElementById("manualRefreshBtn");
+    const syncIndicator = document.getElementById("syncIndicator");
+    
+    if (refreshBtn) {
+        refreshBtn.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin text-xs"></i><span>Syncing...</span>`;
+        refreshBtn.style.opacity = "0.7";
+        refreshBtn.style.pointerEvents = "none";
+    }
+    
+    if (syncIndicator) {
+        syncIndicator.classList.remove("opacity-0");
+        syncIndicator.classList.add("animate-pulse");
+    }
+
+    if (typeof currentLoggedInIdentity !== 'undefined' && currentLoggedInIdentity) {
+        let id = currentLoggedInIdentity;
+        
+        let url = `${APPS_SCRIPT_WEB_APP_URL}?mode=member`;
+        if (id.includes("@")) {
+            url += "&email=" + encodeURIComponent(id);
+        } else {
+            url += "&phone=" + encodeURIComponent(id);
+        }
+
+        try {
+            let res = await fetch(url);
+            let data = await res.json();
+            if(data.status === "ok") {
+                cachedMemberData = data.data;
+                renderAllUI(cachedMemberData);
+            }
+        } catch(err) { 
+            console.error("Manual refresh failed:", err); 
+            alert("Refresh failed. Please check your connection.");
+        }
+    }
+
+    if (syncIndicator) {
+        syncIndicator.classList.add("opacity-0");
+        syncIndicator.classList.remove("animate-pulse");
+    }
+    if (refreshBtn) {
+        refreshBtn.innerHTML = `<i class="fa-solid fa-arrows-rotate text-xs"></i><span>Refresh Data</span>`;
+        refreshBtn.style.opacity = "1";
+        refreshBtn.style.pointerEvents = "auto";
+    }
+}
+
+function renderRedeemHistoryUI(historyData) {
+    const container = document.getElementById("redeemHistoryContainer");
+    if (!container) return;
+
+    if (!historyData || historyData.length === 0) {
+        container.innerHTML = `<div class="text-center py-4 text-xs text-gray-400">No activity history found.</div>`;
+        return;
+    }
+
+    function parseDate(dateStr) {
+        if (!dateStr) return 0;
+        if (dateStr instanceof Date) return dateStr.getTime();
+        
+        let str = String(dateStr).trim();
+        if (str.includes('/')) {
+            const parts = str.split(' ');
+            const dateParts = parts[0].split('/');
+            if (dateParts.length === 3) {
+                const day = dateParts[0];
+                const month = dateParts[1] - 1;
+                const year = dateParts[2];
+                const time = parts[1] || "00:00:00";
+                return new Date(`${year}-${month + 1}-${day} ${time}`).getTime() || new Date(str).getTime();
+            }
+        }
+        return new Date(str).getTime() || 0;
+    }
+
+    const sortedHistory = [...historyData].sort((a, b) => {
+        const timeA = parseDate(a.date || a.redeemedAt || a.timestamp);
+        const timeB = parseDate(b.date || b.redeemedAt || b.timestamp);
+        return timeB - timeA;
+    });
+
+    const recentHistory = sortedHistory.slice(0, 5);
+    
+    let html = "";
+    recentHistory.forEach(item => {
+        const rawPts = item.pointsUsed !== undefined ? item.pointsUsed : (item.points !== undefined ? item.points : item.pointsAdded);
+        const pts = Number(rawPts || 0);
+        const source = String(item.rewardName || item.reward || item.title || item.source || '');
+        
+        const isAdd = source.includes("Add Point") || source.includes("Quick Add") || pts > 0;
+        const displayTitle = isAdd ? (item.rewardName || item.title || 'Add Point') : (item.rewardName || item.reward || item.title || 'Redeemed Item');
+        
+        let pointsText = "";
+        let pointsColorClass = "";
+
+        if (pts === 0) {
+            pointsText = "Free / 0 Pts";
+            pointsColorClass = "text-gray-400";
+        } else if (isAdd) {
+            pointsText = `+${Math.abs(pts)} Pts`;
+            pointsColorClass = "text-emerald-600 font-extrabold";
+        } else {
+            pointsText = `-${Math.abs(pts)} Pts`;
+            pointsColorClass = "text-[#C5221F] font-extrabold";
+        }
+
+        html += `
+            <div class="flex justify-between items-center bg-[#FAF6F0] border border-[#EADCC9] p-3 rounded-xl text-xs">
+                <div>
+                    <span class="font-bold text-[#633A11]">${displayTitle}</span>
+                    <p class="text-[10px] text-gray-400 mt-0.5">${item.date || item.redeemedAt || item.timestamp || '-'}</p>
+                </div>
+                <div class="${pointsColorClass}">
+                    ${pointsText}
+                </div>
+            </div>`;
+    });
+    
+    container.innerHTML = html;
+}
+
+// 打开 Reward 详情弹窗
+function openRewardDetailModal(title, points, imgUrl) {
+    const modal = document.getElementById('rewardDetailModal');
+    const card = document.getElementById('rewardDetailCard');
+    const imgContainer = document.getElementById('modalRewardImgContainer');
+    const titleEl = document.getElementById('modalRewardTitle');
+    const ptsEl = document.getElementById('modalRewardPts');
+
+    if (!modal) return;
+
+    // 填充数据
+    titleEl.innerText = title;
+    ptsEl.innerText = `${points} Pts`;
+
+    if (imgUrl && imgUrl.trim() !== '') {
+        imgContainer.innerHTML = `<img class="w-full h-full object-cover" src="${imgUrl}" alt="Reward">`;
+    } else {
+        imgContainer.innerHTML = '🎁';
+    }
+
+    // 显示 Modal 动画
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        card.classList.remove('scale-95');
+        card.classList.add('scale-100');
+    }, 10);
+}
+
+// 关闭 Reward 详情弹窗
+function closeRewardDetailModal() {
+    const modal = document.getElementById('rewardDetailModal');
+    const card = document.getElementById('rewardDetailCard');
+
+    if (!modal) return;
+
+    modal.classList.add('opacity-0');
+    card.classList.remove('scale-100');
+    card.classList.add('scale-95');
+
+    setTimeout(() => {
+        modal.classList.add('hidden');
+    }, 200);
+}
+</script>
+</body>
+</html>
