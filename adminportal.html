@@ -128,9 +128,9 @@
                     </p>
                 </div>
 
-                <button type="submit" class="btn-block btn-main shadow-sm cursor-pointer flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-right-to-bracket"></i> Log In / Process
-                </button>
+                <button type="submit" id="loginBtn" class="btn-block btn-main shadow-sm cursor-pointer flex items-center justify-center gap-2">
+    <i class="fa-solid fa-right-to-bracket"></i> Log In / Process
+</button>
             </form>
             
             <p id="loginMessage" class="status-msg" style="display: none;"></p>
@@ -218,15 +218,23 @@ function updateAmountPreview(val) {
     }
 }
 
-// 免密码登录逻辑 (兼具加分功能)
+// 🌟 状态锁：防止快速重复点击
+let isLoggingIn = false;
+
+// 免密码登录逻辑 (兼具加分功能 - 防重复加分安全版)
 async function handleDirectLogin() {
+    // 1. 如果已经在请求中，直接拦截后面所有的重复点击
+    if (isLoggingIn) return;
+
     const phoneInput = document.getElementById("loginPhone");
     normalizePhone(phoneInput);
 
     const phone = phoneInput ? phoneInput.value.trim() : "";
     const email = document.getElementById("loginEmail") ? document.getElementById("loginEmail").value.trim() : "";
-    const amountVal = document.getElementById("loginAmount") ? document.getElementById("loginAmount").value.trim() : "";
+    const amountInput = document.getElementById("loginAmount");
+    const amountVal = amountInput ? amountInput.value.trim() : "";
     const msgEl = document.getElementById("loginMessage");
+    const loginBtn = document.getElementById("loginBtn");
 
     const identity = phone || email;
 
@@ -238,6 +246,13 @@ async function handleDirectLogin() {
     const amount = parseFloat(amountVal);
     const isAddingPoints = !isNaN(amount) && amount > 0;
 
+    // 2. 🔐 上锁：禁用按钮，变灰不可点击
+    isLoggingIn = true;
+    if (loginBtn) {
+        loginBtn.disabled = true;
+        loginBtn.classList.add("opacity-50", "pointer-events-none");
+    }
+
     if (isAddingPoints) {
         showStatusMessage(msgEl, `Processing Spend RM ${amount} & Logging In...`, "#633A11");
     } else {
@@ -246,21 +261,39 @@ async function handleDirectLogin() {
 
     currentLoggedInIdentity = identity;
 
-    // 请求后端：支持一次性带上 &amount 进行 Points Log 写入
-    const result = await searchProfileByIdentity(currentLoggedInIdentity, true, isAddingPoints ? amount : null);
-    
-    if (result && result.status === "ok") {
-        document.getElementById("b5SecurityGate").style.display = "none";
+    try {
+        // 3. 发送请求给后端
+        const result = await searchProfileByIdentity(currentLoggedInIdentity, true, isAddingPoints ? amount : null);
         
-        if (isAddingPoints) {
-            showReceipt(`Spent RM ${amount} -> Added +${Math.round(amount)} Points!`, "Staff", "Point Added!");
-        }
+        if (result && result.status === "ok") {
+            // 4. 🧹 关键：成功后立刻清空金额输入框和预览，彻底杜绝重复加分！
+            if (amountInput) {
+                amountInput.value = "";
+                updateAmountPreview("");
+            }
 
-        startIdleTimer();
-        if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-        autoRefreshTimer = setInterval(() => { silentUpdate(); }, 30000);
-    } else {
-        showStatusMessage(msgEl, "Member Record Not Found.", "#C5221F");
+            document.getElementById("b5SecurityGate").style.display = "none";
+            
+            if (isAddingPoints) {
+                showReceipt(`Spent RM ${amount} -> Added +${Math.round(amount)} Points!`, "Staff", "Point Added!");
+            }
+
+            startIdleTimer();
+            if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+            autoRefreshTimer = setInterval(() => { silentUpdate(); }, 30000);
+        } else {
+            showStatusMessage(msgEl, "Member Record Not Found.", "#C5221F");
+        }
+    } catch (err) {
+        console.error("Login error:", err);
+        showStatusMessage(msgEl, "Connection Error.", "#C5221F");
+    } finally {
+        // 5. 🔓 解锁：请求完成后恢复按钮状态
+        isLoggingIn = false;
+        if (loginBtn) {
+            loginBtn.disabled = false;
+            loginBtn.classList.remove("opacity-50", "pointer-events-none");
+        }
     }
 }
 
@@ -558,7 +591,7 @@ function renderAllUI(m) {
                 <span>Account active</span>
                 <div id="syncIndicator" class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse opacity-0 transition-opacity duration-300"></div>
             </div>
-            <button id="manualRefreshBtn" onclick="executeRefreshAfterRedeem()" class="bg-white hover:bg-amber-50/50 text-[#633A11] text-[11px] font-bold px-3 py-1.5 rounded-xl border border-[#EADCC9]/60 shadow-sm transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer">
+            <button id="manualRefreshBtn" onclick="executeRefreshAfterRedeem(true)" class="bg-white hover:bg-amber-50/50 text-[#633A11] text-[11px] font-bold px-3 py-1.5 rounded-xl border border-[#EADCC9]/60 shadow-sm transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer">
                 <i class="fa-solid fa-arrows-rotate text-xs"></i><span>Refresh Data</span>
             </button>
         </div>
@@ -981,7 +1014,7 @@ function closeReceipt() {
     document.getElementById("receiptNotice").classList.add("opacity-0", "pointer-events-none", "translate-y-[-20px]");
 }
 
-// 🌟 1. 核心刷新/数据拉取函数（支持 0.2s 缓存与 &refresh=true 强刷）
+// 🌟 1. 核心刷新/数据拉取函数（带防缓存时间戳 _t & refresh 强刷）
 async function executeRefreshAfterRedeem(forceRefresh = false) {
     if(!currentLoggedInIdentity) return;
     
@@ -992,14 +1025,15 @@ async function executeRefreshAfterRedeem(forceRefresh = false) {
     }
 
     try {
-        let url = `${APPS_SCRIPT_WEB_APP_URL}?mode=member`;
+        // 加上 _t=时间戳，强制击碎浏览器 HTTP GET 缓存
+        let url = `${APPS_SCRIPT_WEB_APP_URL}?mode=member&_t=${Date.now()}`;
         if (currentLoggedInIdentity.includes("@")) {
             url += "&email=" + encodeURIComponent(currentLoggedInIdentity);
         } else {
             url += "&phone=" + encodeURIComponent(currentLoggedInIdentity);
         }
 
-        // 🌟 如果 forceRefresh 为 true，在 URL 末尾带上 &refresh=true 砸碎缓存
+        // 🌟 如果 forceRefresh 为 true，带上 &refresh=true 清除 backend CacheService 缓存
         if (forceRefresh) {
             url += "&refresh=true";
         }
@@ -1010,7 +1044,7 @@ async function executeRefreshAfterRedeem(forceRefresh = false) {
         if(data.status === "ok") {
             cachedMemberData = data.data; 
             if(cachedMemberData) { renderAllUI(cachedMemberData); }
-            console.log(forceRefresh ? "🔄 [强刷] 已成功拉取 Sheet 最新数据" : "⚡ [Cache] 0.2秒极速载入成功");
+            console.log(forceRefresh ? "🔄 [强刷] 已成功拉取 Sheet 最新数据" : "⚡ [Cache] 极速载入成功");
         }
     } catch(err) { 
         console.error("Failed to sync fresh member data after redeem:", err); 
@@ -1019,6 +1053,30 @@ async function executeRefreshAfterRedeem(forceRefresh = false) {
             syncIndicator.classList.remove("animate-pulse");
             setTimeout(() => syncIndicator.classList.add("opacity-0"), 500);
         }
+    }
+}
+
+// 🌟 2. 补全缺失的 silentUpdate 函数（修复每 30 秒后台静默刷新报错）
+async function silentUpdate() {
+    if (!currentLoggedInIdentity) return;
+
+    let id = currentLoggedInIdentity;
+    let url = `${APPS_SCRIPT_WEB_APP_URL}?mode=member&_t=${Date.now()}`;
+    if (id.includes("@")) {
+        url += "&email=" + encodeURIComponent(id);
+    } else {
+        url += "&phone=" + encodeURIComponent(id);
+    }
+
+    try {
+        let res = await fetch(url);
+        let data = await res.json();
+        if (data.status === "ok" && data.data) {
+            cachedMemberData = data.data;
+            renderAllUI(cachedMemberData);
+        }
+    } catch (err) {
+        console.log("Silent update skipped:", err);
     }
 }
 
