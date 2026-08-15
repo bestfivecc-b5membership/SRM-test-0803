@@ -262,11 +262,10 @@ let autoRefreshTimer = null;
 let isCatalogExpanded = false;
 let cachedMemberData = null;
 
-// 👁️ 新增：控制密码可见性切换的函数
+// 👁️ 控制密码可见性切换
 function togglePasswordVisibility(inputId, btn) {
     const input = document.getElementById(inputId);
-    const icon = btn.querySelector('i');
-    
+    const icon = btn ? btn.querySelector('i') : null;
     if (!input || !icon) return;
 
     if (input.type === "password") {
@@ -358,7 +357,6 @@ async function handleFrontendLogin() {
     }
 }
 
-// 1️⃣ 触发发送验证码（仅发送，不改动密码）
 async function triggerForgotPassword() {
     const inputIdentity = document.getElementById("loginIdentity");
     normalizeLoginIdentity(inputIdentity);
@@ -379,12 +377,9 @@ async function triggerForgotPassword() {
         const result = await response.json();
 
         if (result.status === "ok") {
-            currentLoggedInIdentity = identity; // 锁定当前 Identity
-            
-            // 切换卡片：隐藏 Login，显示 Code 验证卡片
+            currentLoggedInIdentity = identity;
             document.getElementById("b5LoginPanel").style.display = "none";
             document.getElementById("b5VerifyCodePanel").style.display = "block";
-            
             document.getElementById("emailAuthCode").value = "";
             showStatusMessage(document.getElementById("verifyCodeMessage"), "", "");
         } else {
@@ -395,7 +390,6 @@ async function triggerForgotPassword() {
     }
 }
 
-// 2️⃣ 提交验证码校验
 async function handleVerifyCode() {
     const code = document.getElementById("emailAuthCode").value.trim();
     const msgEl = document.getElementById("verifyCodeMessage");
@@ -413,7 +407,6 @@ async function handleVerifyCode() {
         const result = await response.json();
 
         if (result.status === "ok") {
-            // 验证通过，进入强制设置新密码界面！
             document.getElementById("b5VerifyCodePanel").style.display = "none";
             document.getElementById("b5ForceChangePanel").style.display = "block";
         } else {
@@ -424,7 +417,6 @@ async function handleVerifyCode() {
     }
 }
 
-// 3️⃣ 返回登录界面
 function backToLoginPanel() {
     document.getElementById("b5VerifyCodePanel").style.display = "none";
     document.getElementById("b5ForceChangePanel").style.display = "none";
@@ -491,16 +483,16 @@ function resetPortal() {
 }
 
 function formatDateOnly(dateStr){
-    if(!dateStr) return "-";
+    if(!dateStr || dateStr === "-") return "-";
     const d = new Date(dateStr);
-    return d.toLocaleDateString("en-CA");
+    return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString("en-CA");
 }
 
 function checkIsExpired(expiryStr) {
-    if(!expiryStr) return false;
+    if(!expiryStr || expiryStr === "-") return false;
     const today = new Date(); today.setHours(0,0,0,0);
     const exp = new Date(expiryStr); exp.setHours(0,0,0,0);
-    return today > exp;
+    return isNaN(exp.getTime()) ? false : today > exp;
 }
 
 function normalizePhone(input){
@@ -568,7 +560,32 @@ function renderAllUI(m) {
     const voucherScrollBox = document.getElementById("voucherScrollContainer");
     const savedScrollLeft = voucherScrollBox ? voucherScrollBox.scrollLeft : 0;
 
-    const stamp = m.stamp || { current: 0, limit: 7 };
+    const today = new Date();
+    const currentMonthKey = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, '0');
+    const logs = Array.isArray(m.stamp_logs) ? m.stamp_logs : (Array.isArray(m.stampLogs) ? m.stampLogs : []);
+    
+    const currentMonthLogs = logs.filter(log => {
+        const mk = log["Month Key"] || log.monthKey || log.month_key;
+        return mk === currentMonthKey;
+    });
+
+    let calculatedStampCount = 0;
+    if (currentMonthLogs.length > 0) {
+        calculatedStampCount = Math.max(...currentMonthLogs.map(l => Number(l["Stamp Count"] || l.stampCount || 0)));
+    }
+
+    const stamp = {
+        current: Math.min(isNaN(calculatedStampCount) ? 0 : calculatedStampCount, 7),
+        limit: 7,
+        monthKey: currentMonthKey
+    };
+
+    const hasRedeemed3 = currentMonthLogs.some(l => String(l["Reward Triggered"] || l.reward || "").includes("STAMP3_REDEEMED"));
+    const hasRedeemed7 = currentMonthLogs.some(l => String(l["Reward Triggered"] || l.reward || "").includes("STAMP7_REDEEMED"));
+
+    m.stamp3_redeemed = hasRedeemed3;
+    m.stamp7_redeemed = hasRedeemed7;
+
     const referral = m.referral || { total: 0, tier: "Member" };
     const settings = m.settings || {};
     const points = m.points || { balance: 0, expiry: "-" };
@@ -589,56 +606,21 @@ function renderAllUI(m) {
     if (referral.total >= t50) { 
         tierName = `💎 ${settings.referralTier50Name || "Platinum"}`;
         tierDiscount = `${settings.referralTier50Discount || "20%"}`;
-        tierRewardHtml = `
-            <div class="mt-4 p-3 bg-black/20 rounded-xl border border-white/10 flex justify-between items-center text-left">
-                <div>
-                    <div class="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider">🎁 Monthly Platinum Reward</div>
-                    <div class="text-base font-black text-white mt-0.5">${settings.referralTier50Discount || "Platinum Reward"}</div>
-                </div>
-                <div id="box-tier50" class="scale-110 shrink-0">${renderActionBtnHtml(true, !!m.tier50_redeemed, false, 'btn-tier50')}</div>
-            </div>`;
-    }
-    else if (referral.total >= t35) { 
+        tierRewardHtml = `<div class="mt-4 p-3 bg-black/20 rounded-xl border border-white/10 flex justify-between items-center text-left"><div><div class="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider">🎁 Monthly Platinum Reward</div><div class="text-base font-black text-white mt-0.5">${settings.referralTier50Discount || "Platinum Reward"}</div></div><div id="box-tier50" class="scale-110 shrink-0">${renderActionBtnHtml(true, !!m.tier50_redeemed, false, 'btn-tier50')}</div></div>`;
+    } else if (referral.total >= t35) { 
         tierName = `🥇 ${settings.referralTier35Name || "Gold"}`;
         tierDiscount = `${settings.referralTier35Discount || "15%"}`;
-        tierRewardHtml = `
-            <div class="mt-4 p-3 bg-black/20 rounded-xl border border-white/10 flex justify-between items-center text-left">
-                <div>
-                    <div class="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider">🎁 Monthly Gold Reward</div>
-                    <div class="text-base font-black text-white mt-0.5">${settings.referralTier35Discount || "Gold Reward"}</div>
-                </div>
-                <div id="box-tier35" class="scale-110 shrink-0">${renderActionBtnHtml(true, !!m.tier35_redeemed, false, 'btn-tier35')}</div>
-            </div>`;
-    }
-    else if (referral.total >= t20) { 
+        tierRewardHtml = `<div class="mt-4 p-3 bg-black/20 rounded-xl border border-white/10 flex justify-between items-center text-left"><div><div class="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider">🎁 Monthly Gold Reward</div><div class="text-base font-black text-white mt-0.5">${settings.referralTier35Discount || "Gold Reward"}</div></div><div id="box-tier35" class="scale-110 shrink-0">${renderActionBtnHtml(true, !!m.tier35_redeemed, false, 'btn-tier35')}</div></div>`;
+    } else if (referral.total >= t20) { 
         tierName = `🥈 ${settings.referralTier20Name || "Silver"}`;
         tierDiscount = `${settings.referralTier20Discount || "10%"}`;
-        tierRewardHtml = `
-            <div class="mt-4 p-3 bg-black/20 rounded-xl border border-white/10 flex justify-between items-center text-left">
-                <div>
-                    <div class="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider">🎁 Monthly Silver Reward</div>
-                    <div class="text-base font-black text-white mt-0.5">${settings.referralTier20Discount || "Silver Reward"}</div>
-                </div>
-                <div id="box-tier20" class="scale-110 shrink-0">${renderActionBtnHtml(true, !!m.tier20_redeemed, false, 'btn-tier20')}</div>
-            </div>`;
-    }
-    else if (referral.total >= t10) { 
+        tierRewardHtml = `<div class="mt-4 p-3 bg-black/20 rounded-xl border border-white/10 flex justify-between items-center text-left"><div><div class="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider">🎁 Monthly Silver Reward</div><div class="text-base font-black text-white mt-0.5">${settings.referralTier20Discount || "Silver Reward"}</div></div><div id="box-tier20" class="scale-110 shrink-0">${renderActionBtnHtml(true, !!m.tier20_redeemed, false, 'btn-tier20')}</div></div>`;
+    } else if (referral.total >= t10) { 
         tierName = `🥉 ${settings.referralTier10Name || "Bronze"}`;
         tierDiscount = `${settings.referralTier10Discount || "5%"}`;
-        tierRewardHtml = `
-            <div class="mt-4 p-3 bg-black/20 rounded-xl border border-white/10 flex justify-between items-center text-left">
-                <div>
-                    <div class="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider">🎁 Monthly Bronze Reward</div>
-                    <div class="text-base font-black text-white mt-0.5">${settings.referralTier10Discount || "Bronze Reward"}</div>
-                </div>
-                <div id="box-tier10" class="scale-110 shrink-0">${renderActionBtnHtml(true, !!m.tier10_redeemed, false, 'btn-tier10')}</div>
-            </div>`;
-    }
-    else {
-        tierRewardHtml = `
-            <div class="mt-4 p-2 bg-black/10 rounded-xl text-center text-xs text-amber-200/60 italic">
-                Invite ${t10 - referral.total} more friends to unlock Monthly Tier Rewards!
-            </div>`;
+        tierRewardHtml = `<div class="mt-4 p-3 bg-black/20 rounded-xl border border-white/10 flex justify-between items-center text-left"><div><div class="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider">🎁 Monthly Bronze Reward</div><div class="text-base font-black text-white mt-0.5">${settings.referralTier10Discount || "Bronze Reward"}</div></div><div id="box-tier10" class="scale-110 shrink-0">${renderActionBtnHtml(true, !!m.tier10_redeemed, false, 'btn-tier10')}</div></div>`;
+    } else {
+        tierRewardHtml = `<div class="mt-4 p-2 bg-black/10 rounded-xl text-center text-xs text-amber-200/60 italic">Invite ${t10 - referral.total} more friends to unlock Monthly Tier Rewards!</div>`;
     }
 
     const spinExp = checkIsExpired(m.reward?.expiry);
@@ -697,14 +679,13 @@ function renderAllUI(m) {
         <div class="col-span-full flex justify-between items-center mt-2 mb-1 px-1">
             <div class="text-xs text-[#8C745A] font-medium flex items-center gap-1.5">
                 <span>Account secured</span>
-                <div id="syncIndicator" class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse opacity-0 transition-opacity duration-300"></div>
+                <div class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse opacity-100"></div>
             </div>
             <button id="manualRefreshBtn" onclick="triggerManualRefresh()" class="bg-white hover:bg-amber-50/50 text-[#633A11] text-[11px] font-bold px-3 py-1.5 rounded-xl border border-[#EADCC9]/60 shadow-sm transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer">
                 <i class="fa-solid fa-arrows-rotate text-xs"></i><span>Refresh Data</span>
             </button>
         </div>
 
-        <!-- 👤 Profile 卡片专区 -->
         <section onclick="openProfileModal()" class="bg-[#633A11] text-[#FAF6F0] rounded-3xl p-6 premium-shadow relative overflow-hidden flex flex-col justify-between min-h-[250px] lg:col-span-1 cursor-pointer hover:scale-[1.01] transition-transform duration-200">
             <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-[#B87E31] opacity-20 rounded-full blur-2xl"></div>
             
@@ -743,7 +724,6 @@ function renderAllUI(m) {
             </div>
         </section>
 
-        <!-- 🎁 优惠券专区 -->
         <section class="bg-white rounded-3xl p-5 border border-[#F2E4D4] premium-shadow lg:col-span-2">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-extrabold text-xs text-[#633A11] uppercase tracking-wider">🎁 Your Vouchers</h3>
@@ -751,7 +731,6 @@ function renderAllUI(m) {
             </div>
             <div id="voucherScrollContainer" class="flex md:grid md:grid-cols-3 gap-4 overflow-x-auto pb-1 no-scrollbar snap-x">
                 
-                <!-- 1. SPIN 卡片 -->
                 <div class="min-w-[250px] md:min-w-0 bg-[#FAF6F0] border border-[#EADCC9] rounded-2xl p-4 flex flex-col justify-between snap-start shadow-sm">
                     <div class="flex justify-between items-start gap-2">
                         <div class="flex-1 min-w-0">
@@ -773,7 +752,6 @@ function renderAllUI(m) {
                     </div>
                 </div>
 
-                <!-- 2. BIRTHDAY 卡片 -->
                 <div class="min-w-[250px] md:min-w-0 bg-[#FAF6F0] border border-[#EADCC9] rounded-2xl p-4 flex flex-col justify-between snap-start shadow-sm">
                     <div class="flex justify-between items-start gap-2">
                         <div class="flex-1 min-w-0">
@@ -795,7 +773,6 @@ function renderAllUI(m) {
                     </div>
                 </div>
 
-                <!-- 3. PROMO 卡片 -->
                 <div class="min-w-[250px] md:min-w-0 bg-[#FAF6F0] border border-[#EADCC9] rounded-2xl p-4 flex flex-col justify-between snap-start shadow-sm">
                     <div class="flex justify-between items-start gap-2">
                         <div class="flex-1 min-w-0">
@@ -820,7 +797,6 @@ function renderAllUI(m) {
             </div>
         </section>
 
-        <!-- ☕ 印章卡专区 -->
         <section class="bg-white rounded-3xl p-5 border border-[#F2E4D4] premium-shadow lg:col-span-1">
             <div class="flex justify-between items-center mb-1">
                 <h3 class="font-extrabold text-xs text-[#633A11] uppercase tracking-wider">☕ Monthly Visit Stamp</h3>
@@ -854,7 +830,6 @@ function renderAllUI(m) {
             </div>
         </section>
 
-        <!-- 👥 推荐路程专区 -->
         <section class="bg-white rounded-3xl p-5 border border-[#F2E4D4] premium-shadow lg:col-span-2">
             <div class="flex justify-between items-center mb-1">
                 <h3 class="font-extrabold text-xs text-[#633A11] uppercase tracking-wider">👥 Referral Journey</h3>
@@ -904,13 +879,11 @@ function renderAllUI(m) {
             </div>
         </section>
 
-        <!-- 🛍️ 兑换商品专区 -->
         <section class="bg-white rounded-3xl p-5 border border-[#F2E4D4] premium-shadow col-span-full">
             <div class="flex justify-between items-center mb-3.5"><h3 class="font-extrabold text-xs text-[#633A11] uppercase tracking-wider">🛍️ Rewards Catalog</h3></div>
             <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" id="catalogGrid">${renderCatalogTier(m.catalog || [], points.balance)}</div>
         </section>
 
-        <!-- 📜 兑换历史专区 -->
         <section class="bg-white rounded-3xl p-5 border border-[#F2E4D4] premium-shadow col-span-full">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="font-extrabold text-xs text-[#633A11] uppercase tracking-wider">📜 Redemption History (Last 5)</h3>
@@ -1052,8 +1025,10 @@ function openProfileModal(latestProfile = null) {
 function closeModal() {
     const modal = document.getElementById("detailsModal");
     const container = document.getElementById("modalContainer");
-    modal.classList.add("opacity-0", "pointer-events-none");
-    container.classList.add("scale-95");
+    if (modal && container) {
+        modal.classList.add("opacity-0", "pointer-events-none");
+        container.classList.add("scale-95");
+    }
 }
 
 function renderCatalogTier(catalog, currentPoints){
@@ -1074,9 +1049,9 @@ function renderCatalogTier(catalog, currentPoints){
             actionAreaHtml = `<div class="w-full bg-gray-200/60 text-gray-400 text-center text-[10px] py-1.5 rounded-xl font-bold">Need ${diff} Pts</div>`;
         }
         
-        // 转义字符串防止单双引号导致 JS 报错
-        const safeRewardName = (item.reward || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-        const safeImg = (item.image || '').replace(/'/g, "\\'");
+        // 安全清洗字符串（防单双引号及换行符破坏 HTML 结构）
+        const safeRewardName = (item.reward || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/[\r\n]+/g, ' ');
+        const safeImg = (item.image || '').replace(/'/g, "\\'").replace(/[\r\n]+/g, '');
 
         html += `
             <div onclick="openRewardDetailModal('${safeRewardName}', '${item.points}', '${safeImg}')" 
@@ -1115,16 +1090,10 @@ async function triggerManualRefresh() {
         refreshBtn.style.opacity = "0.7";
         refreshBtn.style.pointerEvents = "none";
     }
-    
-    if (syncIndicator) {
-        syncIndicator.classList.remove("opacity-0");
-        syncIndicator.classList.add("animate-pulse");
-    }
 
     if (typeof currentLoggedInIdentity !== 'undefined' && currentLoggedInIdentity) {
         let id = currentLoggedInIdentity;
-        
-        let url = `${APPS_SCRIPT_WEB_APP_URL}?mode=member`;
+        let url = `${APPS_SCRIPT_WEB_APP_URL}?mode=member&refresh=true&_t=${Date.now()}`;
         if (id.includes("@")) {
             url += "&email=" + encodeURIComponent(id);
         } else {
@@ -1144,10 +1113,6 @@ async function triggerManualRefresh() {
         }
     }
 
-    if (syncIndicator) {
-        syncIndicator.classList.add("opacity-0");
-        syncIndicator.classList.remove("animate-pulse");
-    }
     if (refreshBtn) {
         refreshBtn.innerHTML = `<i class="fa-solid fa-arrows-rotate text-xs"></i><span>Refresh Data</span>`;
         refreshBtn.style.opacity = "1";
@@ -1159,7 +1124,7 @@ function renderRedeemHistoryUI(historyData) {
     const container = document.getElementById("redeemHistoryContainer");
     if (!container) return;
 
-    if (!historyData || historyData.length === 0) {
+    if (!Array.isArray(historyData) || historyData.length === 0) {
         container.innerHTML = `<div class="text-center py-4 text-xs text-gray-400">No activity history found.</div>`;
         return;
     }
@@ -1173,14 +1138,16 @@ function renderRedeemHistoryUI(historyData) {
             const parts = str.split(' ');
             const dateParts = parts[0].split('/');
             if (dateParts.length === 3) {
-                const day = dateParts[0];
-                const month = dateParts[1] - 1;
-                const year = dateParts[2];
-                const time = parts[1] || "00:00:00";
-                return new Date(`${year}-${month + 1}-${day} ${time}`).getTime() || new Date(str).getTime();
+                const day = parseInt(dateParts[0], 10);
+                const month = parseInt(dateParts[1], 10) - 1;
+                const year = parseInt(dateParts[2], 10);
+                const timeStr = parts[1] || "00:00:00";
+                const d = new Date(year, month, day);
+                return isNaN(d.getTime()) ? 0 : d.getTime();
             }
         }
-        return new Date(str).getTime() || 0;
+        const parsed = new Date(str).getTime();
+        return isNaN(parsed) ? 0 : parsed;
     }
 
     const sortedHistory = [...historyData].sort((a, b) => {
@@ -1229,7 +1196,6 @@ function renderRedeemHistoryUI(historyData) {
     container.innerHTML = html;
 }
 
-// 打开 Reward 详情弹窗
 function openRewardDetailModal(title, points, imgUrl) {
     const modal = document.getElementById('rewardDetailModal');
     const card = document.getElementById('rewardDetailCard');
@@ -1239,7 +1205,6 @@ function openRewardDetailModal(title, points, imgUrl) {
 
     if (!modal) return;
 
-    // 填充数据
     titleEl.innerText = title;
     ptsEl.innerText = `${points} Pts`;
 
@@ -1249,16 +1214,16 @@ function openRewardDetailModal(title, points, imgUrl) {
         imgContainer.innerHTML = '🎁';
     }
 
-    // 显示 Modal 动画
     modal.classList.remove('hidden');
     setTimeout(() => {
         modal.classList.remove('opacity-0');
-        card.classList.remove('scale-95');
-        card.classList.add('scale-100');
+        if(card) {
+            card.classList.remove('scale-95');
+            card.classList.add('scale-100');
+        }
     }, 10);
 }
 
-// 关闭 Reward 详情弹窗
 function closeRewardDetailModal() {
     const modal = document.getElementById('rewardDetailModal');
     const card = document.getElementById('rewardDetailCard');
@@ -1266,12 +1231,37 @@ function closeRewardDetailModal() {
     if (!modal) return;
 
     modal.classList.add('opacity-0');
-    card.classList.remove('scale-100');
-    card.classList.add('scale-95');
+    if(card) {
+        card.classList.remove('scale-100');
+        card.classList.add('scale-95');
+    }
 
     setTimeout(() => {
         modal.classList.add('hidden');
     }, 200);
+}
+
+async function silentUpdate() {
+    if (!currentLoggedInIdentity) return;
+
+    let id = currentLoggedInIdentity;
+    let url = `${APPS_SCRIPT_WEB_APP_URL}?mode=member&_t=${Date.now()}`;
+    if (id.includes("@")) {
+        url += "&email=" + encodeURIComponent(id);
+    } else {
+        url += "&phone=" + encodeURIComponent(id);
+    }
+
+    try {
+        let res = await fetch(url);
+        let data = await res.json();
+        if (data.status === "ok" && data.data) {
+            cachedMemberData = data.data;
+            renderAllUI(cachedMemberData);
+        }
+    } catch (err) {
+        console.log("Silent update skipped:", err);
+    }
 }
 </script>
 </body>
