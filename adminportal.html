@@ -355,6 +355,7 @@ async function searchProfileByIdentity(identity, showLoading = false, addAmount 
     }
 }
 
+// 🌟 5. 店员/顾客模式切换（切换成功 -> 强刷 true）
 async function triggerAdminToggle() {
     const indicator = document.getElementById("adminIndicator");
     const topBar = document.getElementById("topBar");
@@ -365,7 +366,7 @@ async function triggerAdminToggle() {
         if (topBar) topBar.classList.replace("bg-[#4A1D1D]", "bg-[#633A11]");
         
         if (cachedMemberData) {
-            await executeRefreshAfterRedeem();
+            await executeRefreshAfterRedeem(true); // 👈 切回顾客模式，强刷最新状态
         } else {
             renderAllUI(cachedMemberData);
         }
@@ -393,7 +394,7 @@ async function triggerAdminToggle() {
             alert("Successfully switched to Staff Mode.");
             
             if (cachedMemberData) {
-                await executeRefreshAfterRedeem();
+                await executeRefreshAfterRedeem(true); // 👈 切到店员模式，强刷最新状态
             } else {
                 renderAllUI(cachedMemberData);
             }
@@ -405,6 +406,11 @@ async function triggerAdminToggle() {
         alert("Network error. Failed to verify passcode.");
     }
 }
+
+// 🌟 6. 刷新按钮点击事件（绑定界面上的刷新按钮/图标）
+document.getElementById("refreshBtn")?.addEventListener("click", () => {
+    executeRefreshAfterRedeem(true); // 👈 显式传入 true，强刷！
+});
 
 function renderAllUI(m) {
     if (!m) return;
@@ -975,7 +981,8 @@ function closeReceipt() {
     document.getElementById("receiptNotice").classList.add("opacity-0", "pointer-events-none", "translate-y-[-20px]");
 }
 
-async function executeRefreshAfterRedeem() {
+// 🌟 1. 核心刷新/数据拉取函数（支持 0.2s 缓存与 &refresh=true 强刷）
+async function executeRefreshAfterRedeem(forceRefresh = false) {
     if(!currentLoggedInIdentity) return;
     
     const syncIndicator = document.getElementById("syncIndicator");
@@ -992,12 +999,18 @@ async function executeRefreshAfterRedeem() {
             url += "&phone=" + encodeURIComponent(currentLoggedInIdentity);
         }
 
+        // 🌟 如果 forceRefresh 为 true，在 URL 末尾带上 &refresh=true 砸碎缓存
+        if (forceRefresh) {
+            url += "&refresh=true";
+        }
+
         let res = await fetch(url);
         let data = await res.json();
         
         if(data.status === "ok") {
             cachedMemberData = data.data; 
             if(cachedMemberData) { renderAllUI(cachedMemberData); }
+            console.log(forceRefresh ? "🔄 [强刷] 已成功拉取 Sheet 最新数据" : "⚡ [Cache] 0.2秒极速载入成功");
         }
     } catch(err) { 
         console.error("Failed to sync fresh member data after redeem:", err); 
@@ -1037,6 +1050,7 @@ function verifyStaffAccessSecurity() {
     return staffName.trim();
 }
 
+// 🌟 2. Passcode 优惠券核销（核销成功 -> 强刷 true）
 async function triggerPasscodeAction(type, itemDisplayName, targetBoxId, phone) {
     const containerBox = document.getElementById(targetBoxId);
     let originalHtml = containerBox.innerHTML;
@@ -1052,12 +1066,13 @@ async function triggerPasscodeAction(type, itemDisplayName, targetBoxId, phone) 
         if(data.status === "ok"){ 
             containerBox.innerHTML = `<span class="text-[10px] text-gray-400 font-bold bg-gray-100 px-2.5 py-1 rounded-lg select-none cursor-default">Used</span>`;
             showReceipt(itemDisplayName, staffName); 
-            await executeRefreshAfterRedeem(); 
+            await executeRefreshAfterRedeem(true); // 👈 核销完，传入 true 强刷！
         } 
         else { alert("❌ Backend Denied: " + data.status); containerBox.innerHTML = originalHtml; }
     } catch (err) { alert("⚠️ Connection Timeout."); containerBox.innerHTML = originalHtml; }
 }
 
+// 🌟 3. 里程碑奖励核销（核销成功 -> 强刷 true）
 async function triggerMilestoneAction(type, itemDisplayName, targetBoxId, phone) {
     const containerBox = document.getElementById(targetBoxId);
     if (!containerBox) return;
@@ -1079,7 +1094,7 @@ async function triggerMilestoneAction(type, itemDisplayName, targetBoxId, phone)
             if (data.status === "ok") {
                 showReceipt(itemDisplayName, staffName);
             }
-            await executeRefreshAfterRedeem();
+            await executeRefreshAfterRedeem(true); // 👈 核销完，传入 true 强刷！
         } else {
             alert("❌ Backend Denied: " + data.status);
             containerBox.innerHTML = originalHtml;
@@ -1090,6 +1105,7 @@ async function triggerMilestoneAction(type, itemDisplayName, targetBoxId, phone)
     }
 }
 
+// 🌟 4. 商品积分兑换（兑换成功 -> 强刷 true）
 async function triggerCatalogAction(rewardName, pointsValue, targetBoxId, phone) {
     const containerBox = document.getElementById(targetBoxId);
     let originalHtml = containerBox.innerHTML;
@@ -1107,7 +1123,7 @@ async function triggerCatalogAction(rewardName, pointsValue, targetBoxId, phone)
         const data = await res.json();
         if(data.status === "ok"){ 
             showReceipt(`${rewardName} (Balance: ${data.remaining} Pts)`, staffName); 
-            await executeRefreshAfterRedeem(); 
+            await executeRefreshAfterRedeem(true); // 👈 扣分完，传入 true 强刷！
         } 
         else { alert("❌ Backend Denied: " + data.status); containerBox.innerHTML = originalHtml; }
     } catch (err) { alert("⚠️ Network Error."); containerBox.innerHTML = originalHtml; }
