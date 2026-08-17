@@ -560,31 +560,62 @@ function renderAllUI(m) {
     const voucherScrollBox = document.getElementById("voucherScrollContainer");
     const savedScrollLeft = voucherScrollBox ? voucherScrollBox.scrollLeft : 0;
 
+    // ==================== 🛠️ 盖章核心逻辑（完美兼容旧结构 + 增强容错） ====================
     const today = new Date();
-    const currentMonthKey = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, '0');
+    const year = today.getFullYear();
+    const monthNum = today.getMonth() + 1;
+
+    // 兼容 "2026-08" 和 "2026-8" 格式
+    const currentMonthKey1 = `${year}-${String(monthNum).padStart(2, '0')}`;
+    const currentMonthKey2 = `${year}-${monthNum}`;
+
     const logs = Array.isArray(m.stamp_logs) ? m.stamp_logs : (Array.isArray(m.stampLogs) ? m.stampLogs : []);
-    
+
+    // 1. 优先从日志中匹配当月记录
     const currentMonthLogs = logs.filter(log => {
-        const mk = log["Month Key"] || log.monthKey || log.month_key;
-        return mk === currentMonthKey;
+        if (!log) return false;
+        let mk = String(log["Month Key"] || log.monthKey || log.month_key || log.month || "").trim();
+        if (mk.length >= 7 && mk.includes("-")) {
+            mk = mk.substring(0, 7);
+        }
+        return mk === currentMonthKey1 || mk === currentMonthKey2 || mk.startsWith(currentMonthKey1) || mk.startsWith(currentMonthKey2);
     });
 
     let calculatedStampCount = 0;
+
     if (currentMonthLogs.length > 0) {
-        calculatedStampCount = Math.max(...currentMonthLogs.map(l => Number(l["Stamp Count"] || l.stampCount || 0)));
+        calculatedStampCount = Math.max(...currentMonthLogs.map(l => {
+            const cnt = l["Stamp Count"] ?? l.stampCount ?? l.stamp_count ?? l.stamps ?? l.stamp;
+            return Number(cnt || 0);
+        }));
     }
 
+    // 2. 💡 关键兜底：如果从日志拿不到数据/算出来是0，直接读取旧代码支持的 m.stamp 对象或顶层盖章数
+    if (isNaN(calculatedStampCount) || calculatedStampCount === 0) {
+        if (m.stamp && m.stamp.current !== undefined) {
+            calculatedStampCount = Number(m.stamp.current); // 100% 兼容旧数据结构！
+        } else {
+            const directCount = m.stamp_count ?? m.stampCount ?? m.stamps ?? m.stamp ?? m.current_stamps;
+            if (directCount !== undefined && directCount !== null) {
+                calculatedStampCount = Number(directCount);
+            }
+        }
+    }
+
+    // 组装最终的 stamp 对象
     const stamp = {
         current: Math.min(isNaN(calculatedStampCount) ? 0 : calculatedStampCount, 7),
         limit: 7,
-        monthKey: currentMonthKey
+        monthKey: currentMonthKey1
     };
 
-    const hasRedeemed3 = currentMonthLogs.some(l => String(l["Reward Triggered"] || l.reward || "").includes("STAMP3_REDEEMED"));
-    const hasRedeemed7 = currentMonthLogs.some(l => String(l["Reward Triggered"] || l.reward || "").includes("STAMP7_REDEEMED"));
+    // 兑换状态双重判定（日志优先，其次看顶层属性）
+    const hasRedeemed3 = logs.some(l => String(l["Reward Triggered"] || l.reward || l.reward_triggered || "").toUpperCase().includes("STAMP3_REDEEMED")) || !!m.stamp3_redeemed || !!m.stamp3Redeemed;
+    const hasRedeemed7 = logs.some(l => String(l["Reward Triggered"] || l.reward || l.reward_triggered || "").toUpperCase().includes("STAMP7_REDEEMED")) || !!m.stamp7_redeemed || !!m.stamp7Redeemed;
 
     m.stamp3_redeemed = hasRedeemed3;
     m.stamp7_redeemed = hasRedeemed7;
+    // =================================================================================
 
     const referral = m.referral || { total: 0, tier: "Member" };
     const settings = m.settings || {};
